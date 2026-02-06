@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { GameState, Card, MapNode, Enemy } from './types';
 import { CARDS, STARTING_DECK_IDS, ENEMIES, GENERATE_MAP, INITIAL_PLAYER_HP, INITIAL_MAX_ENERGY } from './constants';
 import { GameMap } from './components/GameMap';
@@ -40,6 +41,7 @@ const INITIAL_STATE: GameState = {
 
 const App: React.FC = () => {
     const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
+    const [windowSize, setWindowSize] = useState({ w: window.innerWidth, h: window.innerHeight });
     
     // Dev Mode State
     const [isDevOpen, setIsDevOpen] = useState(false);
@@ -54,6 +56,22 @@ const App: React.FC = () => {
     // Reward Logic
     const [pendingRewards, setPendingRewards] = useState(0);
     const [rewardTutorialSeen, setRewardTutorialSeen] = useState(false);
+
+    // FIX: Handle device resize quirks (Chromebooks/Mobile)
+    useEffect(() => {
+        const handleResize = () => {
+            // Updating state forces a re-render, helping if the layout gets stuck on initial small dimensions
+            setWindowSize({ w: window.innerWidth, h: window.innerHeight });
+        };
+        
+        window.addEventListener('resize', handleResize);
+        
+        // Initial check double-tap (sometimes size reports 0 initially)
+        setTimeout(handleResize, 100);
+        setTimeout(handleResize, 500);
+
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const startGame = () => {
         const deck = createInitialDeck();
@@ -320,7 +338,7 @@ const App: React.FC = () => {
     const nodeType = getCurrentNodeType();
 
     return (
-        <div className="w-screen h-screen bg-black text-white overflow-hidden relative">
+        <div className="fixed inset-0 w-full h-full bg-black text-white overflow-hidden" data-res={windowSize.w}>
             {/* Dev Mode Modal */}
             {isDevOpen && (
                 <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in">

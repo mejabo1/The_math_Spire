@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { MapNode } from '../types';
 import { Skull, HelpCircle, MapPin, Tent, Crown } from 'lucide-react';
@@ -38,7 +39,7 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 relative p-4 md:p-8" style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 relative p-4 md:p-8 overflow-hidden">
         <h2 className="text-2xl md:text-4xl font-serif text-amber-100 mb-4 md:mb-8 tracking-widest uppercase border-b border-amber-500/30 pb-4">The Spire Map</h2>
         
         {godMode && (
