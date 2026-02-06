@@ -140,20 +140,18 @@ const App: React.FC = () => {
         } else if (node.type === 'elite') {
             nextScreen = 'COMBAT';
             isCombatNode = true;
-             // Elite pool includes Fraction Phantom
-             const pool = [ENEMIES[1], ENEMIES[2]]; // Imp, Phantom
-             const count = 2;
+             // Elite encounter: Single Fraction Phantom
+             const template = ENEMIES[2]; // Fraction Phantom
              
-             for(let i=0; i<count; i++) {
-                const template = pool[Math.floor(Math.random() * pool.length)];
-                const maxHp = Math.floor(template.maxHp * 1.2);
-                enemies.push({
-                    ...template,
-                    id: `${template.id}-${Date.now()}-${i}`,
-                    currentHp: devOneHpMode ? 1 : maxHp,
-                    maxHp: devOneHpMode ? 1 : maxHp
-                });
-            }
+             // Keep the elite buff (1.2x HP)
+             const maxHp = Math.floor(template.maxHp * 1.2);
+             
+             enemies.push({
+                ...template,
+                id: `${template.id}-${Date.now()}`,
+                currentHp: devOneHpMode ? 1 : maxHp,
+                maxHp: devOneHpMode ? 1 : maxHp
+            });
 
         } else if (node.type === 'boss') {
             nextScreen = 'COMBAT';
