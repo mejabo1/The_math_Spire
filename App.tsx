@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { GameState, Card, MapNode, Enemy } from './types';
 import { CARDS, STARTING_DECK_IDS, ENEMIES, GENERATE_MAP, INITIAL_PLAYER_HP, INITIAL_MAX_ENERGY } from './constants';
@@ -57,20 +56,21 @@ const App: React.FC = () => {
     const [pendingRewards, setPendingRewards] = useState(0);
     const [rewardTutorialSeen, setRewardTutorialSeen] = useState(false);
 
-    // FIX: Handle device resize quirks (Chromebooks/Mobile)
+    // FIX: Handle device resize quirks (Chromebooks/Mobile/Iframes)
     useEffect(() => {
         const handleResize = () => {
-            // Updating state forces a re-render, helping if the layout gets stuck on initial small dimensions
             setWindowSize({ w: window.innerWidth, h: window.innerHeight });
         };
         
         window.addEventListener('resize', handleResize);
         
-        // Initial check double-tap (sometimes size reports 0 initially)
-        setTimeout(handleResize, 100);
-        setTimeout(handleResize, 500);
+        // Force multiple checks to catch post-load resize (common in iframes)
+        const timeouts = [100, 500, 1000, 2000].map(t => setTimeout(handleResize, t));
 
-        return () => window.removeEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            timeouts.forEach(clearTimeout);
+        };
     }, []);
 
     const startGame = () => {
@@ -338,7 +338,10 @@ const App: React.FC = () => {
     const nodeType = getCurrentNodeType();
 
     return (
-        <div className="fixed inset-0 w-full h-full bg-black text-white overflow-hidden" data-res={windowSize.w}>
+        <div 
+            className="fixed inset-0 bg-black text-white overflow-hidden" 
+            style={{ width: `${windowSize.w}px`, height: `${windowSize.h}px` }}
+        >
             {/* Dev Mode Modal */}
             {isDevOpen && (
                 <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in">
@@ -443,7 +446,7 @@ const App: React.FC = () => {
                         <p className="text-xl text-gray-300 mb-8 font-light">Climb the tower. Solve the equations.</p>
                         <button 
                             onClick={startGame}
-                            className="bg-red-700 hover:bg-red-600 text-white font-bold py-4 px-12 rounded-full shadow-[0_0_20px_rgba(185,28,28,0.5)] transition-all hover:scale-105 flex items-center gap-3 mx-auto text-xl"
+                            className="bg-red-700 hover:bg-red-600 text-white font-bold py-4 px-12 rounded-full shadow-[0_0_20px_rgba(185,28,28,0.5)] transition-all hover:scale-105 flex items-center gap-3 mx-auto text-xl cursor-pointer"
                         >
                             <Play fill="white" /> Start Journey
                         </button>
@@ -452,7 +455,7 @@ const App: React.FC = () => {
                     {/* Dev Mode Trigger Button */}
                     <button 
                         onClick={() => setIsDevOpen(true)}
-                        className="absolute bottom-6 right-6 p-3 bg-black/40 text-slate-500 hover:text-white hover:bg-black/60 rounded-full transition-all backdrop-blur-sm border border-transparent hover:border-slate-500"
+                        className="absolute bottom-6 right-6 p-3 bg-black/40 text-slate-500 hover:text-white hover:bg-black/60 rounded-full transition-all backdrop-blur-sm border border-transparent hover:border-slate-500 cursor-pointer"
                         title="Dev Mode"
                     >
                         <Wrench size={24} />
@@ -471,7 +474,7 @@ const App: React.FC = () => {
                     {/* Map Screen Dev Mode Trigger */}
                     <button 
                         onClick={() => setIsDevOpen(true)}
-                        className="absolute top-6 right-6 p-3 bg-black/40 text-slate-500 hover:text-white hover:bg-black/60 rounded-full transition-all backdrop-blur-sm border border-transparent hover:border-slate-500 z-50"
+                        className="absolute top-6 right-6 p-3 bg-black/40 text-slate-500 hover:text-white hover:bg-black/60 rounded-full transition-all backdrop-blur-sm border border-transparent hover:border-slate-500 z-50 cursor-pointer"
                         title="Dev Mode"
                     >
                         <Wrench size={24} />
@@ -513,7 +516,7 @@ const App: React.FC = () => {
                     <p className="text-2xl text-red-200 mb-8">The numbers were too strong.</p>
                     <button 
                         onClick={() => setGameState(INITIAL_STATE)}
-                        className="bg-white text-red-900 font-bold py-3 px-8 rounded hover:bg-gray-200 flex items-center gap-2"
+                        className="bg-white text-red-900 font-bold py-3 px-8 rounded hover:bg-gray-200 flex items-center gap-2 cursor-pointer"
                     >
                        <RotateCw /> Try Again
                     </button>
@@ -530,7 +533,7 @@ const App: React.FC = () => {
                         
                         <button 
                             onClick={() => setGameState(INITIAL_STATE)}
-                            className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all hover:scale-105 flex items-center gap-3 mx-auto text-xl"
+                            className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all hover:scale-105 flex items-center gap-3 mx-auto text-xl cursor-pointer"
                         >
                            <RotateCw /> Play Again
                         </button>
