@@ -57,24 +57,24 @@ export const CardReward: React.FC<CardRewardProps> = ({ onSelect, type = 'combat
         </div>
       )}
       
-      <div className="relative z-10 flex flex-col items-center max-w-5xl w-full p-8">
+      <div className="relative z-10 flex flex-col items-center max-w-5xl w-full p-4 md:p-8">
         
-        <div className="bg-amber-900/40 p-4 rounded-full border-2 border-amber-500/50 mb-6 animate-pulse-slow">
+        <div className="bg-amber-900/40 p-4 rounded-full border-2 border-amber-500/50 mb-4 md:mb-6 animate-pulse-slow">
             {isRest ? (
-                <Tent size={48} className="text-amber-400" />
+                <Tent size={32} className="md:w-12 md:h-12 text-amber-400" />
             ) : (
-                <Trophy size={48} className="text-yellow-400" />
+                <Trophy size={32} className="md:w-12 md:h-12 text-yellow-400" />
             )}
         </div>
 
-        <h2 className="text-4xl font-serif text-amber-100 mb-2 drop-shadow-lg">
+        <h2 className="text-2xl md:text-4xl font-serif text-amber-100 mb-2 drop-shadow-lg">
             {isRest ? "Rest & Reforge" : "Victory!"}
         </h2>
-        <p className="text-xl text-amber-200/80 mb-12 font-light">
+        <p className="text-sm md:text-xl text-amber-200/80 mb-8 md:mb-12 font-light text-center">
             {isRest ? "Choose a new technique to add to your deck." : "Claim your reward: Add a card to your deck."}
         </p>
 
-        <div className="flex flex-wrap justify-center gap-8 md:gap-16">
+        <div className="flex flex-wrap justify-center gap-4 md:gap-16">
           {rewardCards.map((card, idx) => (
             <div key={idx} className="flex flex-col items-center group">
                 <div className="transform transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-4">
@@ -88,7 +88,7 @@ export const CardReward: React.FC<CardRewardProps> = ({ onSelect, type = 'combat
                 <button 
                     onClick={() => onSelect(card)}
                     disabled={showTutorial}
-                    className="mt-6 px-6 py-2 bg-slate-800 hover:bg-amber-600 border border-slate-600 hover:border-amber-400 text-slate-200 hover:text-white rounded-full font-bold transition-all opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 disabled:opacity-0"
+                    className="mt-4 md:mt-6 px-6 py-2 bg-slate-800 hover:bg-amber-600 border border-slate-600 hover:border-amber-400 text-slate-200 hover:text-white rounded-full font-bold transition-all opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 disabled:opacity-0 text-sm md:text-base"
                 >
                     Select
                 </button>
