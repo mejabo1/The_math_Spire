@@ -1,4 +1,5 @@
 
+
 import { Card, Enemy, MapNode } from './types';
 
 export const INITIAL_PLAYER_HP = 30;
@@ -22,8 +23,8 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     name: 'Absolute Shield',
     type: 'skill',
     cost: 2,
-    value: 5,
-    description: 'Gain 5 Block.',
+    value: 2,
+    description: 'Gain 2 Block.',
     effectId: 'gain_block',
     rarity: 'common',
     mathType: 'addition'
@@ -51,9 +52,9 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
   divided_cleave: {
     name: 'Divided Cleave',
     type: 'attack',
-    cost: 2,
-    value: 4,
-    description: 'Deal 4 damage to ALL enemies.',
+    cost: 3,
+    value: 3,
+    description: 'Deal 2 damage to ALL enemies.',
     effectId: 'damage_all',
     rarity: 'rare',
     mathType: 'division'
@@ -72,7 +73,7 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
   keep_change_change: {
     name: 'Keep Change Change',
     type: 'attack',
-    cost: 1,
+    cost: 2,
     value: 2,
     description: 'Gain 1 Block. Deal 2 damage.',
     effectId: 'block_damage',
@@ -178,6 +179,16 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     effectId: 'block_enemy',
     rarity: 'epic',
     mathType: 'algebra'
+  },
+  reckless_attack: {
+    name: 'Reckless Attack',
+    type: 'attack',
+    cost: 1,
+    value: 5,
+    description: 'Deal 5 damage. Lose 1 HP.',
+    effectId: 'reckless_attack',
+    rarity: 'common',
+    mathType: 'prime_factors'
   }
 };
 
@@ -193,7 +204,8 @@ export const REWARD_POOL_IDS = [
   'divided_fraction_split',
   'variable_strike',
   'absolute_value',
-  'balance_equation'
+  'balance_equation',
+  'reckless_attack'
 ];
 
 export const STARTING_DECK_IDS = [
@@ -248,9 +260,9 @@ export const ENEMIES: Enemy[] = [
   {
     id: 'boss_geometry',
     name: 'The Poly-Gone',
-    maxHp: 50,
-    currentHp: 50,
-    intent: { type: 'buff', value: 1 },
+    maxHp: 30, // Lowered from 50
+    currentHp: 30, // Lowered from 50
+    intent: { type: 'attack', value: 5 }, // Raised intent to Attack 5 (was Buff 1)
     image: SVG_BOSS_POLYGONE
   }
 ];

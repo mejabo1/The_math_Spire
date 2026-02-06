@@ -11,7 +11,8 @@ import { Play, RotateCw, Wrench, Lock, X, Bug, Trophy, Unlock, Skull } from 'luc
 const createInitialDeck = (): Card[] => {
     return STARTING_DECK_IDS.map(id => ({
         ...CARDS[id],
-        id: id + Math.random().toString(36).substr(2, 9)
+        id: id + Math.random().toString(36).substr(2, 9),
+        upgraded: false
     }) as Card);
 };
 
@@ -23,6 +24,7 @@ const INITIAL_STATE: GameState = {
         energy: INITIAL_MAX_ENERGY,
         maxEnergy: INITIAL_MAX_ENERGY,
         block: 0,
+        gold: 50, // Start with some gold
         deck: [],
         discardPile: [],
         drawPile: [],
@@ -193,19 +195,28 @@ const App: React.FC = () => {
 
     const handleCombatVictory = (remainingHp: number) => {
         const currentNode = gameState.map.find(n => n.id === gameState.currentMapNodeId);
-        // Set rewards: 2 if elite, 1 otherwise
-        setPendingRewards(currentNode?.type === 'elite' ? 2 : 1);
+        const isElite = currentNode?.type === 'elite';
+        const isBoss = currentNode?.type === 'boss' || gameState.currentEnemies.some(e => e.id.includes('boss'));
+        
+        // Reward Logic
+        setPendingRewards(isElite ? 2 : 1);
+        
+        // Gold Logic
+        let goldReward = 10;
+        if (isElite) goldReward = 20;
+        if (isBoss) goldReward = 50;
 
         setGameState(prev => {
-            // Check if it's a boss node OR if we just fought a boss (useful for dev mode where map is empty)
-            const isBoss = currentNode?.type === 'boss' || prev.currentEnemies.some(e => e.id.includes('boss'));
-
             if (isBoss) {
                  return {
                     ...prev,
                     screen: 'VICTORY',
                     currentEnemies: [],
-                    player: { ...prev.player, currentHp: remainingHp }
+                    player: { 
+                        ...prev.player, 
+                        currentHp: remainingHp,
+                        gold: prev.player.gold + goldReward
+                    }
                 };
             }
 
@@ -213,7 +224,11 @@ const App: React.FC = () => {
                 ...prev,
                 screen: 'REWARD',
                 currentEnemies: [],
-                player: { ...prev.player, currentHp: remainingHp }
+                player: { 
+                    ...prev.player, 
+                    currentHp: remainingHp,
+                    gold: prev.player.gold + goldReward
+                }
             };
         });
     };
@@ -232,6 +247,7 @@ const App: React.FC = () => {
             if (reward) {
                 newPlayer.maxHp += 10;
                 newPlayer.currentHp += 10;
+                newPlayer.gold += 50; // Bonus gold for riddle
             }
             return {
                 ...prev,
@@ -241,14 +257,13 @@ const App: React.FC = () => {
         });
     };
 
+    // Called when choosing a card to Add to deck
     const handleCardRewardSelect = (card: Card) => {
         const nextRewards = pendingRewards - 1;
         setPendingRewards(nextRewards);
 
         setGameState(prev => {
             const newCard = { ...card, id: card.id + Math.random().toString(36).substr(2, 5) };
-            const healAmount = 5;
-            const newHp = Math.min(prev.player.maxHp, prev.player.currentHp + healAmount);
             const newDeck = [...prev.player.deck, newCard];
 
             return {
@@ -258,8 +273,42 @@ const App: React.FC = () => {
                 player: {
                     ...prev.player,
                     deck: newDeck,
-                    currentHp: newHp
                 }
+            };
+        });
+    };
+    
+    // Called from Rest Site
+    const handleRestOption = (action: 'heal' | 'upgrade' | 'leave', cardToUpgrade?: Card, cost: number = 0) => {
+        setGameState(prev => {
+            let newPlayer = { ...prev.player };
+            
+            if (action === 'heal') {
+                const healAmt = Math.floor(newPlayer.maxHp * 0.3); // Heal 30%
+                newPlayer.currentHp = Math.min(newPlayer.maxHp, newPlayer.currentHp + healAmt);
+            } else if (action === 'upgrade' && cardToUpgrade) {
+                // Deduct Gold
+                newPlayer.gold = Math.max(0, newPlayer.gold - cost);
+                
+                // Upgrade Card in Deck
+                newPlayer.deck = newPlayer.deck.map(c => {
+                    if (c.id === cardToUpgrade.id) {
+                        return {
+                            ...c,
+                            upgraded: true,
+                            name: c.name + "+",
+                            value: c.value + 3, // Basic Upgrade Logic: +3 Potency
+                            description: c.description.replace(/\d+/, (match) => (parseInt(match) + 3).toString()) // Rudimentary desc update
+                        };
+                    }
+                    return c;
+                });
+            }
+
+            return {
+                ...prev,
+                screen: 'MAP',
+                player: newPlayer
             };
         });
     };
@@ -431,7 +480,10 @@ const App: React.FC = () => {
                 <CardReward 
                     key={pendingRewards} // Force re-mount to refresh cards when reward count changes
                     onSelect={handleCardRewardSelect} 
+                    onRestOption={handleRestOption}
                     type={nodeType === 'rest' ? 'rest' : 'combat'} 
+                    playerDeck={gameState.player.deck}
+                    playerGold={gameState.player.gold}
                     showTutorial={!rewardTutorialSeen && nodeType !== 'rest'}
                     onTutorialClose={() => setRewardTutorialSeen(true)}
                 />

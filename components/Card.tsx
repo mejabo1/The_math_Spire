@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Card as CardType } from '../types';
 import { Sword, Shield, Zap, Sparkles, Minus, X, Divide, CircleSlash } from 'lucide-react';
@@ -14,14 +15,25 @@ interface CardProps {
 export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, playable, noAnim = false }) => {
   const isAttack = card.type === 'attack';
   const isSkill = card.type === 'skill';
+  const isUpgraded = card.upgraded;
 
   // Responsive Dimensions: w-32 h-44 on small, w-40 h-56 on md+
   const baseClasses = "relative w-32 h-44 md:w-40 md:h-56 rounded-xl border-2 transition-all duration-200 transform select-none cursor-pointer flex flex-col overflow-hidden shadow-lg";
-  const typeClasses = isAttack 
-    ? "bg-rose-900 border-rose-500 hover:bg-rose-800 text-rose-50" 
-    : isSkill 
-      ? "bg-slate-800 border-slate-400 hover:bg-slate-700 text-slate-50"
-      : "bg-amber-900 border-amber-500 hover:bg-amber-800 text-amber-50";
+  
+  // Base background/border logic
+  let typeClasses = "";
+  if (isAttack) {
+      typeClasses = "bg-rose-900 border-rose-500 hover:bg-rose-800 text-rose-50";
+  } else if (isSkill) {
+      typeClasses = "bg-slate-800 border-slate-400 hover:bg-slate-700 text-slate-50";
+  } else {
+      typeClasses = "bg-amber-900 border-amber-500 hover:bg-amber-800 text-amber-50";
+  }
+
+  // Upgraded Override
+  if (isUpgraded) {
+     typeClasses += " ring-2 ring-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.4)]";
+  }
 
   // If noAnim is true, we strip the hover movement/scale classes, allowing parent to control transforms.
   const interactClasses = (playable && !disabled) 
@@ -74,10 +86,10 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
 
       {/* Content */}
       <div className="p-2 md:p-3 flex-1 flex flex-col items-center text-center overflow-hidden">
-        <h3 className="card-title font-bold text-xs md:text-sm mb-1 uppercase tracking-wider leading-tight truncate w-full">
+        <h3 className={`card-title font-bold text-xs md:text-sm mb-1 uppercase tracking-wider leading-tight truncate w-full ${isUpgraded ? 'text-emerald-300' : ''}`}>
           {card.name}
         </h3>
-        <p className="text-[10px] md:text-xs font-light leading-snug text-gray-200 mt-0.5 line-clamp-3">
+        <p className={`text-[10px] md:text-xs font-light leading-snug mt-0.5 line-clamp-3 ${isUpgraded ? 'text-emerald-100' : 'text-gray-200'}`}>
             {card.description}
         </p>
       </div>

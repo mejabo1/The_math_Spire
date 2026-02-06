@@ -1,4 +1,5 @@
 
+
 import { MathTopic } from '../types';
 
 export interface MathProblem {
@@ -36,6 +37,7 @@ export const generateProblem = (forcedTopic?: MathTopic): MathProblem => {
     case 'factorization': return generateFactorization();
     case 'pemdas': return generatePEMDAS();
     case 'absolute_value': return generateAbsoluteValue();
+    case 'prime_factors': return generatePrimeFactors();
     default: return generateArithmetic();
   }
 };
@@ -196,4 +198,52 @@ const generateAbsoluteValue = (): MathProblem => {
           topic: 'Absolute Value'
       };
   }
+};
+
+const generatePrimeFactors = (): MathProblem => {
+  const primes = [2, 3, 5, 7];
+  // Pick 2 to 3 factors to keep numbers reasonable
+  const count = getRandomInt(2, 3);
+  const factors: number[] = [];
+  let product = 1;
+  
+  for(let i=0; i<count; i++) {
+    const p = primes[getRandomInt(0, primes.length - 1)];
+    factors.push(p);
+    product *= p;
+  }
+  
+  factors.sort((a,b) => a-b);
+  const correctAnswer = factors.join(' × ');
+  
+  const options = new Set<string>();
+  options.add(correctAnswer);
+  
+  // Custom option generation for factor strings
+  while(options.size < 4) {
+     const r = Math.random();
+     if (r < 0.4) {
+         // Same length, slightly different primes
+         const wrongFactors = [...factors];
+         wrongFactors[getRandomInt(0, wrongFactors.length-1)] = primes[getRandomInt(0, primes.length-1)];
+         wrongFactors.sort((a,b) => a-b);
+         options.add(wrongFactors.join(' × '));
+     } else if (r < 0.7) {
+         // Totally different random set
+         const wf = [];
+         for(let i=0; i<count; i++) wf.push(primes[getRandomInt(0, primes.length-1)]);
+         wf.sort((a,b) => a-b);
+         options.add(wf.join(' × '));
+     } else {
+         // Fake composite format "1 x Product"
+         options.add(`1 × ${product}`);
+     }
+  }
+
+  return {
+    question: `Prime factorization of ${product}?`,
+    options: Array.from(options).sort(() => Math.random() - 0.5),
+    correctAnswer: correctAnswer,
+    topic: 'Prime Factors'
+  };
 };

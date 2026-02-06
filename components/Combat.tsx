@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Enemy, Card as CardType } from '../types';
 import { CardComponent } from './Card';
@@ -7,7 +8,7 @@ import { PlayerComponent } from './Player';
 import { MathModal } from './MathModal';
 import { TutorialModal } from './TutorialModal';
 import { generateProblem, MathProblem } from '../utils/mathGenerator';
-import { Zap, RotateCcw, ScrollText, Shield as ShieldIcon, Target } from 'lucide-react';
+import { Zap, RotateCcw, ScrollText, Shield as ShieldIcon, Target, Coins } from 'lucide-react';
 
 interface CombatProps {
   player: Player;
@@ -65,6 +66,9 @@ export const Combat: React.FC<CombatProps> = ({
   // Track animation state per enemy ID
   const [enemyAnimStates, setEnemyAnimStates] = useState<Record<string, 'idle' | 'attack' | 'hit'>>({});
   const [enemyFlashes, setEnemyFlashes] = useState<Record<string, boolean>>({});
+
+  // Pile Tooltip State
+  const [hoveredPile, setHoveredPile] = useState<'draw' | 'discard' | null>(null);
 
   const addLog = (message: string) => {
       setCombatLog(prev => [...prev, message]);
@@ -488,7 +492,7 @@ export const Combat: React.FC<CombatProps> = ({
         await processEnemyTurn(enemy);
     }
     setEnemies(prev => prev.map(e => {
-        if (e.currentHp > 0) return { ...e, intent: getRandomIntent() };
+        if (e.currentHp > 0) return { ...e, intent: getRandomIntent(e) };
         return e;
     }));
     setTurnPhase('PLAYER'); 
@@ -519,7 +523,16 @@ export const Combat: React.FC<CombatProps> = ({
       });
   };
 
-  const getRandomIntent = () => {
+  const getRandomIntent = (enemy?: Enemy) => {
+      // Boss Logic: Prioritize heavy hits
+      if (enemy && enemy.id.includes('boss')) {
+          const r = Math.random();
+          if (r > 0.4) return { type: 'attack' as const, value: 5 }; // 60% chance to hit for 5
+          if (r > 0.2) return { type: 'defend' as const, value: 5 }; // 20% chance to defend
+          return { type: 'buff' as const, value: 2 }; // 20% chance to buff
+      }
+
+      // Standard Enemy Logic
       const r = Math.random();
       if (r > 0.6) return { type: 'attack' as const, value: Math.floor(Math.random() * 2) + 1 };
       if (r > 0.3) return { type: 'defend' as const, value: 3 };
@@ -611,19 +624,77 @@ export const Combat: React.FC<CombatProps> = ({
         <div className="h-[30%] min-h-[200px] max-h-[280px] flex flex-col justify-end relative z-20">
             
             {/* Energy Indicator */}
-            <div className="absolute left-2 md:left-10 top-0 z-20 flex flex-col items-center">
+            <div className="absolute left-2 md:left-10 top-0 z-20 flex flex-col items-center gap-2">
                 <div className="relative group">
                     <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center border-4 border-amber-200">
                         <Zap className="fill-white text-white w-6 h-6 md:w-8 md:h-8" />
                         <span className="text-xl md:text-3xl font-bold text-white drop-shadow-md ml-1">{player.energy}/{player.maxEnergy}</span>
                     </div>
                 </div>
+                
+                {/* Gold Indicator Added Here for Visibility during Combat */}
+                <div className="bg-black/60 px-2 py-1 rounded-full border border-yellow-500/30 text-yellow-400 flex items-center gap-1 text-xs md:text-sm font-bold">
+                    <Coins size={14} /> {player.gold}
+                </div>
             </div>
 
             {/* Deck Counts */}
-            <div className="absolute left-2 md:left-4 bottom-2 md:bottom-4 text-[10px] md:text-xs font-bold text-slate-500 flex flex-col gap-1">
-                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700">Draw: {player.drawPile.length}</div>
-                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700">Discard: {player.discardPile.length}</div>
+            <div className="absolute left-2 md:left-4 bottom-2 md:bottom-4 text-[10px] md:text-xs font-bold text-slate-500 flex flex-col gap-1 z-30">
+                {/* Draw Pile */}
+                <div 
+                    className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative"
+                    onMouseEnter={() => setHoveredPile('draw')}
+                    onMouseLeave={() => setHoveredPile(null)}
+                >
+                    Draw: {player.drawPile.length}
+                    {hoveredPile === 'draw' && (
+                        <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-xl text-slate-200 pointer-events-none z-50">
+                            <h4 className="text-amber-500 font-serif border-b border-slate-600 pb-1 mb-2">Draw Pile</h4>
+                            {player.drawPile.length === 0 ? <span className="italic text-slate-500">Empty</span> : (
+                                <ul className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                                    {Object.entries(player.drawPile.reduce((acc, card) => {
+                                        const name = card.name;
+                                        acc[name] = (acc[name] || 0) + 1;
+                                        return acc;
+                                    }, {} as Record<string, number>)).sort((a,b) => a[0].localeCompare(b[0])).map(([name, count]) => (
+                                        <li key={name} className="flex justify-between">
+                                            <span className="truncate mr-2">{name}</span>
+                                            <span className="text-slate-500">x{count}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Discard Pile */}
+                <div 
+                    className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative"
+                    onMouseEnter={() => setHoveredPile('discard')}
+                    onMouseLeave={() => setHoveredPile(null)}
+                >
+                    Discard: {player.discardPile.length}
+                    {hoveredPile === 'discard' && (
+                        <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-xl text-slate-200 pointer-events-none z-50">
+                            <h4 className="text-amber-500 font-serif border-b border-slate-600 pb-1 mb-2">Discard Pile</h4>
+                            {player.discardPile.length === 0 ? <span className="italic text-slate-500">Empty</span> : (
+                                <ul className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                                    {Object.entries(player.discardPile.reduce((acc, card) => {
+                                        const name = card.name;
+                                        acc[name] = (acc[name] || 0) + 1;
+                                        return acc;
+                                    }, {} as Record<string, number>)).sort((a,b) => a[0].localeCompare(b[0])).map(([name, count]) => (
+                                        <li key={name} className="flex justify-between">
+                                            <span className="truncate mr-2">{name}</span>
+                                            <span className="text-slate-500">x{count}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* End Turn Button */}

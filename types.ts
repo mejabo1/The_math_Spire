@@ -1,7 +1,8 @@
 
+
 export type CardType = 'attack' | 'skill' | 'power';
 
-export type MathTopic = 'arithmetic' | 'algebra' | 'geometry' | 'percentage' | 'addition' | 'subtraction' | 'integer' | 'multiplication' | 'division' | 'exponent' | 'factorization' | 'pemdas' | 'absolute_value';
+export type MathTopic = 'arithmetic' | 'algebra' | 'geometry' | 'percentage' | 'addition' | 'subtraction' | 'integer' | 'multiplication' | 'division' | 'exponent' | 'factorization' | 'pemdas' | 'absolute_value' | 'prime_factors';
 
 export interface Card {
   id: string;
@@ -13,6 +14,7 @@ export interface Card {
   effectId: string; // ID to map to logic
   rarity: 'common' | 'rare' | 'epic';
   mathType?: MathTopic; // Optional: Force a specific math problem type for this card
+  upgraded?: boolean; // New flag for upgrade status
 }
 
 export interface EnemyIntent {
@@ -35,6 +37,7 @@ export interface Player {
   energy: number;
   maxEnergy: number;
   block: number;
+  gold: number; // New currency
   deck: Card[];
   discardPile: Card[];
   drawPile: Card[];
