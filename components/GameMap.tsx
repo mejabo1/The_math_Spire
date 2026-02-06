@@ -38,7 +38,7 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 relative p-4 md:p-8">
+    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 relative p-4 md:p-8" style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         <h2 className="text-2xl md:text-4xl font-serif text-amber-100 mb-4 md:mb-8 tracking-widest uppercase border-b border-amber-500/30 pb-4">The Spire Map</h2>
         
         {godMode && (
@@ -48,12 +48,15 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
         )}
         
         {/* Responsive Map Container: 85% of viewport min dimension, max 600px */}
-        <div className="relative w-[85vmin] h-[85vmin] max-w-[600px] max-h-[600px] bg-slate-800 rounded-full shadow-2xl border-4 border-slate-700 overflow-hidden shrink-0">
+        <div 
+            className="relative w-[85vmin] h-[85vmin] max-w-[600px] max-h-[600px] bg-slate-800 rounded-full shadow-2xl border-4 border-slate-700 overflow-hidden shrink-0"
+            style={{ position: 'relative', borderRadius: '9999px', margin: 'auto' }}
+        >
              {/* Simple Background Pattern */}
              <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/graphy.png')]"></div>
 
             {/* Render Connections first */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none">
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
                 {mapNodes.map(node => {
                     return node.next.map(nextId => {
                         const nextNode = mapNodes.find(n => n.id === nextId);
@@ -98,7 +101,18 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
                     <div 
                         key={node.id}
                         className={nodeClass}
-                        style={{ left: `${node.x}%`, top: `${node.y}%` }}
+                        style={{ 
+                            left: `${node.x}%`, 
+                            top: `${node.y}%`, 
+                            position: 'absolute',
+                            transform: 'translate(-50%, -50%)',
+                            width: '40px',
+                            height: '40px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '50%'
+                        }}
                         onClick={() => selectable && onNodeSelect(node)}
                     >
                         {getIcon(node.type)}
