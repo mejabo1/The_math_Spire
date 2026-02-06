@@ -5,10 +5,6 @@ export const INITIAL_PLAYER_HP = 30;
 export const INITIAL_MAX_ENERGY = 3;
 export const HAND_SIZE = 5;
 
-// IMPORTANT: This must be a direct link to an image file (ending in .jpg, .png, etc.), not a website URL.
-// Using a dark fantasy castle/dungeon interior for the battle background.
-export const CUSTOM_BACKGROUND = "https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?q=80&w=2069&auto=format&fit=crop";
-
 // --- CARD LIBRARY ---
 
 export const CARDS: Record<string, Omit<Card, 'id'>> = {
@@ -244,17 +240,17 @@ export const ENEMIES: Enemy[] = [
   {
     id: 'fraction_phantom',
     name: 'Fraction Phantom',
-    maxHp: 45,
-    currentHp: 45,
-    intent: { type: 'attack', value: 7 },
+    maxHp: 20,
+    currentHp: 20,
+    intent: { type: 'attack', value: 6 },
     image: SVG_FRACTION_PHANTOM
   },
   {
     id: 'boss_geometry',
     name: 'The Poly-Gone',
-    maxHp: 100,
-    currentHp: 100,
-    intent: { type: 'buff', value: 0 },
+    maxHp: 50,
+    currentHp: 50,
+    intent: { type: 'buff', value: 1 },
     image: SVG_BOSS_POLYGONE
   }
 ];
@@ -262,21 +258,32 @@ export const ENEMIES: Enemy[] = [
 // --- MAP GENERATION HELPERS ---
 
 export const GENERATE_MAP = (): MapNode[] => {
-    // Simplified 3-tier map
+    // 5-Tier Map
     const nodes: MapNode[] = [];
     
-    // Tier 1: 3 Combat Rooms
-    nodes.push({ id: '1-1', type: 'combat', x: 20, y: 80, next: ['2-1', '2-2'], completed: false });
-    nodes.push({ id: '1-2', type: 'combat', x: 50, y: 80, next: ['2-2'], completed: false });
-    nodes.push({ id: '1-3', type: 'combat', x: 80, y: 80, next: ['2-2', '2-3'], completed: false });
+    // Floor 1: The Entrance (Combat) - y: 90
+    nodes.push({ id: '1-1', type: 'combat', x: 25, y: 90, next: ['2-1', '2-2'], completed: false });
+    nodes.push({ id: '1-2', type: 'combat', x: 50, y: 90, next: ['2-2', '2-3'], completed: false });
+    nodes.push({ id: '1-3', type: 'combat', x: 75, y: 90, next: ['2-3', '2-4'], completed: false });
 
-    // Tier 2: Event or Elite
-    nodes.push({ id: '2-1', type: 'event', x: 30, y: 50, next: ['3-1'], completed: false });
-    nodes.push({ id: '2-2', type: 'elite', x: 50, y: 50, next: ['3-1'], completed: false });
-    nodes.push({ id: '2-3', type: 'rest', x: 70, y: 50, next: ['3-1'], completed: false });
+    // Floor 2: The Fork (Combat/Event) - y: 72
+    nodes.push({ id: '2-1', type: 'combat', x: 20, y: 72, next: ['3-1', '3-2'], completed: false });
+    nodes.push({ id: '2-2', type: 'event', x: 40, y: 72, next: ['3-2'], completed: false });
+    nodes.push({ id: '2-3', type: 'combat', x: 60, y: 72, next: ['3-2', '3-3'], completed: false });
+    nodes.push({ id: '2-4', type: 'event', x: 80, y: 72, next: ['3-3'], completed: false });
 
-    // Tier 3: Boss
-    nodes.push({ id: '3-1', type: 'boss', x: 50, y: 20, next: [], completed: false });
+    // Floor 3: The Midpoint (Elite/Rest) - y: 54
+    nodes.push({ id: '3-1', type: 'elite', x: 30, y: 54, next: ['4-1', '4-2'], completed: false });
+    nodes.push({ id: '3-2', type: 'rest', x: 50, y: 54, next: ['4-2'], completed: false });
+    nodes.push({ id: '3-3', type: 'elite', x: 70, y: 54, next: ['4-2', '4-3'], completed: false });
+
+    // Floor 4: The Ascent (Prep) - y: 36
+    nodes.push({ id: '4-1', type: 'event', x: 30, y: 36, next: ['5-1'], completed: false });
+    nodes.push({ id: '4-2', type: 'combat', x: 50, y: 36, next: ['5-1'], completed: false });
+    nodes.push({ id: '4-3', type: 'rest', x: 70, y: 36, next: ['5-1'], completed: false });
+
+    // Floor 5: The Boss - y: 15
+    nodes.push({ id: '5-1', type: 'boss', x: 50, y: 15, next: [], completed: false });
 
     return nodes;
 };

@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { ChevronRight, Zap, Brain, Shield, Sword, X } from 'lucide-react';
+import { ChevronRight, Zap, Brain, Shield, Sword, X, RefreshCw, Layers } from 'lucide-react';
 
 interface TutorialModalProps {
   onClose: () => void;
@@ -18,6 +19,23 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ onClose }) => {
       title: "Energy & Cards",
       content: "You have 3 Energy per turn (top left). Playing cards costs Energy. Click a card to play it.",
       icon: <Zap size={64} className="text-yellow-400" />
+    },
+    {
+      title: "The Deck Cycle",
+      content: "You draw 5 cards every turn. Played cards go to your Discard pile. When your Draw pile is empty, your Discard pile is shuffled to form a new Draw pile.",
+      icon: (
+        <div className="flex items-center gap-6 text-slate-300">
+           <div className="flex flex-col items-center gap-1">
+              <Layers size={32} />
+              <span className="text-xs">Draw</span>
+           </div>
+           <RefreshCw size={24} className="text-amber-500 animate-spin-slow" />
+           <div className="flex flex-col items-center gap-1">
+              <Layers size={32} className="opacity-50" />
+              <span className="text-xs">Discard</span>
+           </div>
+        </div>
+      )
     },
     {
       title: "Math is Power",
@@ -55,12 +73,12 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ onClose }) => {
             <X size={24} />
         </button>
 
-        <div className="mb-6 mt-4 p-6 bg-slate-900 rounded-full border border-slate-700 shadow-inner">
+        <div className="mb-6 mt-4 p-6 bg-slate-900 rounded-full border border-slate-700 shadow-inner min-h-[120px] flex items-center justify-center">
             {steps[step].icon}
         </div>
 
         <h2 className="text-3xl font-serif text-amber-100 mb-4">{steps[step].title}</h2>
-        <p className="text-lg text-slate-300 mb-8 leading-relaxed px-4">
+        <p className="text-lg text-slate-300 mb-8 leading-relaxed px-4 min-h-[80px]">
             {steps[step].content}
         </p>
 

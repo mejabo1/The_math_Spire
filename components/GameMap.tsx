@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { MapNode } from '../types';
 import { Skull, HelpCircle, MapPin, Tent, Crown } from 'lucide-react';
@@ -6,9 +7,10 @@ interface MapProps {
   mapNodes: MapNode[];
   currentNodeId: string | null;
   onNodeSelect: (node: MapNode) => void;
+  godMode?: boolean;
 }
 
-export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSelect }) => {
+export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSelect, godMode = false }) => {
   
   const getIcon = (type: string) => {
     switch (type) {
@@ -22,6 +24,8 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
   };
 
   const isNodeSelectable = (node: MapNode) => {
+    if (godMode) return true;
+
     if (!currentNodeId) {
         // Only allow selecting starting nodes (Tier 1, usually low Y or distinct ID pattern)
         // In our generator, Tier 1 is id '1-x'
@@ -37,6 +41,12 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 relative p-8">
         <h2 className="text-4xl font-serif text-amber-100 mb-8 tracking-widest uppercase border-b border-amber-500/30 pb-4">The Spire Map</h2>
+        
+        {godMode && (
+            <div className="absolute top-4 right-4 bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded animate-pulse font-bold">
+                GOD MODE ACTIVE
+            </div>
+        )}
         
         <div className="relative w-[600px] h-[600px] bg-slate-800 rounded-full shadow-2xl border-4 border-slate-700 overflow-hidden">
              {/* Simple Background Pattern */}
@@ -74,7 +84,7 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
                 
                 if (isCurrent) {
                     nodeClass += "bg-amber-500 border-white shadow-[0_0_20px_rgba(245,158,11,0.6)] scale-125 text-white";
-                } else if (isCompleted) {
+                } else if (isCompleted && !godMode) {
                     nodeClass += "bg-emerald-700 border-emerald-500 opacity-60 grayscale";
                 } else if (selectable) {
                     nodeClass += "bg-slate-600 border-white hover:bg-slate-500 hover:scale-110 cursor-pointer animate-pulse-slow shadow-lg text-white";
@@ -96,7 +106,7 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
         </div>
 
         <div className="mt-8 text-center text-gray-400 text-sm">
-            Select a highlighted node to proceed.
+            {godMode ? "GOD MODE: Select any node to teleport." : "Select a highlighted node to proceed."}
         </div>
     </div>
   );

@@ -3,14 +3,16 @@ import React, { useMemo } from 'react';
 import { Card as CardType } from '../types';
 import { CARDS, REWARD_POOL_IDS } from '../constants';
 import { CardComponent } from './Card';
-import { Tent, Trophy } from 'lucide-react';
+import { Tent, Trophy, Info } from 'lucide-react';
 
 interface CardRewardProps {
   onSelect: (card: CardType) => void;
   type?: 'rest' | 'combat';
+  showTutorial?: boolean;
+  onTutorialClose?: () => void;
 }
 
-export const CardReward: React.FC<CardRewardProps> = ({ onSelect, type = 'combat' }) => {
+export const CardReward: React.FC<CardRewardProps> = ({ onSelect, type = 'combat', showTutorial = false, onTutorialClose }) => {
   
   // Memoize random selection so it doesn't reshuffle on re-renders
   const rewardCards = useMemo(() => {
@@ -29,8 +31,31 @@ export const CardReward: React.FC<CardRewardProps> = ({ onSelect, type = 'combat
   const isRest = type === 'rest';
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 bg-[url('https://images.unsplash.com/photo-1579208575657-c595a05383b7?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center">
+    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 bg-[url('https://images.unsplash.com/photo-1579208575657-c595a05383b7?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center relative">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+
+      {/* Reward Tutorial Modal */}
+      {showTutorial && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md animate-fade-in">
+             <div className="bg-slate-800 border-2 border-amber-500 rounded-xl p-8 max-w-md w-full shadow-2xl text-center relative">
+                 <div className="mx-auto w-16 h-16 bg-amber-900/50 rounded-full flex items-center justify-center mb-4 border border-amber-500/30">
+                     <Info size={32} className="text-amber-400" />
+                 </div>
+                 <h3 className="text-2xl font-serif text-amber-100 mb-4">Expanding Your Arsenal</h3>
+                 <p className="text-slate-300 mb-6 leading-relaxed">
+                     Victory brings rewards! You can now choose <strong>one card</strong> to add to your deck permanently. 
+                     <br/><br/>
+                     Choose wisely to build powerful combinations!
+                 </p>
+                 <button 
+                    onClick={onTutorialClose}
+                    className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all hover:scale-105"
+                 >
+                    Got it!
+                 </button>
+             </div>
+        </div>
+      )}
       
       <div className="relative z-10 flex flex-col items-center max-w-5xl w-full p-8">
         
@@ -56,13 +81,14 @@ export const CardReward: React.FC<CardRewardProps> = ({ onSelect, type = 'combat
                     <CardComponent 
                         card={card} 
                         onClick={() => onSelect(card)} 
-                        disabled={false} 
+                        disabled={showTutorial} 
                         playable={true} 
                     />
                 </div>
                 <button 
                     onClick={() => onSelect(card)}
-                    className="mt-6 px-6 py-2 bg-slate-800 hover:bg-amber-600 border border-slate-600 hover:border-amber-400 text-slate-200 hover:text-white rounded-full font-bold transition-all opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0"
+                    disabled={showTutorial}
+                    className="mt-6 px-6 py-2 bg-slate-800 hover:bg-amber-600 border border-slate-600 hover:border-amber-400 text-slate-200 hover:text-white rounded-full font-bold transition-all opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 disabled:opacity-0"
                 >
                     Select
                 </button>
