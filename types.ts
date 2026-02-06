@@ -2,7 +2,7 @@
 
 export type CardType = 'attack' | 'skill' | 'power';
 
-export type MathTopic = 'arithmetic' | 'algebra' | 'geometry' | 'percentage' | 'addition' | 'subtraction' | 'integer' | 'multiplication' | 'division' | 'exponent' | 'factorization' | 'pemdas' | 'absolute_value' | 'prime_factors';
+export type MathTopic = 'arithmetic' | 'algebra' | 'geometry' | 'percentage' | 'addition' | 'subtraction' | 'integer' | 'multiplication' | 'division' | 'exponent' | 'factorization' | 'pemdas' | 'absolute_value' | 'prime_factors' | 'subtraction_3digit' | 'decimal_addition' | 'decimal_multiplication' | 'decimal_division' | 'fraction_simplification';
 
 export interface Card {
   id: string;

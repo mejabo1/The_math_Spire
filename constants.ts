@@ -2,9 +2,9 @@
 
 import { Card, Enemy, MapNode } from './types';
 
-export const INITIAL_PLAYER_HP = 30;
+export const INITIAL_PLAYER_HP = 20;
 export const INITIAL_MAX_ENERGY = 3;
-export const HAND_SIZE = 5;
+export const HAND_SIZE = 4;
 
 // --- CARD LIBRARY ---
 
@@ -90,7 +90,6 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     rarity: 'common',
     mathType: 'multiplication'
   },
-  // --- NEW REQUESTED CARDS ---
   pop_quiz: {
     name: 'Pop Quiz',
     type: 'skill',
@@ -98,16 +97,6 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     value: 2,
     description: 'Gain 2 Energy. Exhausts if math answer is wrong.',
     effectId: 'gain_energy',
-    rarity: 'common'
-    // Random math topic by default (undefined mathType)
-  },
-  show_your_work: {
-    name: 'Show Your Work',
-    type: 'skill',
-    cost: 1,
-    value: 4,
-    description: 'Gain 4 Block.',
-    effectId: 'gain_block',
     rarity: 'common'
   },
   factor_defense: {
@@ -126,17 +115,17 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     cost: 1,
     value: 3,
     description: 'Deal 3 damage. Incorrect answer reduces Block by 2.',
-    effectId: 'deal_damage', // Penalty handled in combat logic via "risk" check or just basic damage for now
+    effectId: 'deal_damage', 
     rarity: 'common',
     mathType: 'pemdas'
   },
   chain_calculation: {
     name: 'Chain Calculation',
     type: 'attack',
-    cost: 2,
+    cost: 3,
     value: 3,
-    description: 'Deal 3 damage 2 times.',
-    effectId: 'multi_hit_2', // Simplified from "solve 2 problems" to "multi-hit" for engine stability
+    description: 'Deal 2 damage 2 times.',
+    effectId: 'multi_hit_2', 
     rarity: 'rare',
     mathType: 'arithmetic'
   },
@@ -148,7 +137,7 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     description: 'Deal 2 damage to ALL enemies.',
     effectId: 'damage_all',
     rarity: 'rare',
-    mathType: 'division' // Fraction division specific in generator
+    mathType: 'division' 
   },
   variable_strike: {
     name: 'Variable Strike',
@@ -189,6 +178,58 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     effectId: 'reckless_attack',
     rarity: 'common',
     mathType: 'prime_factors'
+  },
+
+  // --- NEW REQUESTED CARDS ---
+  clean_eraser: {
+    name: 'Clean Eraser',
+    type: 'skill',
+    cost: 1,
+    value: 0,
+    description: 'Exhaust 1 card from hand. Draw 1 card.',
+    effectId: 'exhaust_1_draw_1',
+    rarity: 'common',
+    mathType: 'subtraction_3digit'
+  },
+  show_your_work: {
+    name: 'Show Your Work',
+    type: 'skill',
+    cost: 1,
+    value: 0,
+    description: 'Exhaust 1 card from hand. Draw 2 cards.',
+    effectId: 'exhaust_1_draw_2',
+    rarity: 'common',
+    mathType: 'decimal_addition'
+  },
+  mistake_detector: {
+    name: 'Mistake Detector',
+    type: 'attack',
+    cost: 1,
+    value: 0,
+    description: 'Exhaust 1 card from hand. Deal damage equal to its cost.',
+    effectId: 'damage_exhaust',
+    rarity: 'rare',
+    mathType: 'decimal_multiplication'
+  },
+  simplify: {
+    name: 'Simplify',
+    type: 'skill',
+    cost: 1,
+    value: 0,
+    description: 'Reduce the cost of a card in hand by 1.',
+    effectId: 'reduce_cost',
+    rarity: 'rare',
+    mathType: 'fraction_simplification'
+  },
+  loose_notes_chaos: {
+    name: 'Loose Notes Chaos',
+    type: 'skill',
+    cost: 3,
+    value: 0,
+    description: 'Shuffle your hand. Reduce cost of ALL cards in hand by 1.',
+    effectId: 'chaos_hand',
+    rarity: 'epic',
+    mathType: 'decimal_division'
   }
 };
 
@@ -197,7 +238,6 @@ export const REWARD_POOL_IDS = [
   'keep_change_change',
   'aggressive_multiplied',
   'pop_quiz',
-  'show_your_work',
   'factor_defense',
   'order_of_ops',
   'chain_calculation',
@@ -205,7 +245,12 @@ export const REWARD_POOL_IDS = [
   'variable_strike',
   'absolute_value',
   'balance_equation',
-  'reckless_attack'
+  'reckless_attack',
+  'clean_eraser',
+  'show_your_work',
+  'mistake_detector',
+  'simplify',
+  'loose_notes_chaos'
 ];
 
 export const STARTING_DECK_IDS = [

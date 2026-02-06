@@ -10,6 +10,10 @@ export interface MathProblem {
 }
 
 const getRandomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+const getRandomDecimal = (min: number, max: number, precision: number = 1) => {
+    const val = Math.random() * (max - min) + min;
+    return parseFloat(val.toFixed(precision));
+};
 
 export const generateProblem = (forcedTopic?: MathTopic): MathProblem => {
   let type = forcedTopic;
@@ -38,6 +42,14 @@ export const generateProblem = (forcedTopic?: MathTopic): MathProblem => {
     case 'pemdas': return generatePEMDAS();
     case 'absolute_value': return generateAbsoluteValue();
     case 'prime_factors': return generatePrimeFactors();
+    
+    // New Topics
+    case 'subtraction_3digit': return generateSubtraction3Digit();
+    case 'decimal_addition': return generateDecimalAddition();
+    case 'decimal_multiplication': return generateDecimalMultiplication();
+    case 'decimal_division': return generateDecimalDivision();
+    case 'fraction_simplification': return generateFractionSimplification();
+    
     default: return generateArithmetic();
   }
 };
@@ -51,9 +63,17 @@ const generateOptions = (correct: number | string, type: 'number' | 'string' = '
     if (type === 'number') {
       const val = Number(correct);
       // Generate close numbers for distraction but not too tricky
-      wrong = val + getRandomInt(-5, 5);
-      if (wrong === val) wrong = val + 1;
+      // Handle decimals
+      if (val % 1 !== 0) {
+           wrong = parseFloat((val + (Math.random() > 0.5 ? 0.1 : -0.1) * getRandomInt(1, 10)).toFixed(2));
+           if (wrong === val) wrong = val + 0.5;
+      } else {
+           wrong = val + getRandomInt(-5, 5);
+           if (wrong === val) wrong = val + 1;
+      }
     } else {
+        // String fallback (fractions etc)
+        // Just generic placeholder randomizer if specific logic isn't called
         wrong = (Number(correct) + getRandomInt(1, 10)).toString(); 
     }
     options.add(wrong.toString());
@@ -142,7 +162,7 @@ const generatePercentage = (): MathProblem => {
     return { question: `${percent}% of ${total}?`, options: generateOptions(ans), correctAnswer: ans.toString(), topic: 'Percentage' };
 };
 
-// --- NEW GENERATORS ---
+// --- COMPLEX GENERATORS ---
 
 const generateFactorization = (): MathProblem => {
   // Find the Greatest Common Factor (GCF)
@@ -246,4 +266,95 @@ const generatePrimeFactors = (): MathProblem => {
     correctAnswer: correctAnswer,
     topic: 'Prime Factors'
   };
+};
+
+// --- NEW TOPICS ---
+
+const generateSubtraction3Digit = (): MathProblem => {
+    const a = getRandomInt(300, 999);
+    const b = getRandomInt(100, 299);
+    const ans = a - b;
+    return { 
+        question: `${a} - ${b} = ?`, 
+        options: generateOptions(ans), 
+        correctAnswer: ans.toString(), 
+        topic: 'Subtraction (3-Digit)' 
+    };
+};
+
+const generateDecimalAddition = (): MathProblem => {
+    const a = getRandomDecimal(1, 10, 1);
+    const b = getRandomDecimal(1, 10, 1);
+    const ans = parseFloat((a + b).toFixed(1));
+    return {
+        question: `${a} + ${b} = ?`,
+        options: generateOptions(ans, 'number'),
+        correctAnswer: ans.toString(),
+        topic: 'Decimal Addition'
+    };
+};
+
+const generateDecimalMultiplication = (): MathProblem => {
+    // Keep it simple: 0.5 * 4, 1.2 * 3
+    const isSmall = Math.random() > 0.5;
+    let a, b;
+    if (isSmall) {
+        a = parseFloat((getRandomInt(1, 9) / 10).toFixed(1)); // 0.1 to 0.9
+        b = getRandomInt(2, 10);
+    } else {
+        a = getRandomDecimal(1, 5, 1);
+        b = getRandomInt(2, 5);
+    }
+    const ans = parseFloat((a * b).toFixed(2));
+    
+    return {
+        question: `${a} × ${b} = ?`,
+        options: generateOptions(ans, 'number'),
+        correctAnswer: ans.toString(),
+        topic: 'Decimal Multiplication'
+    };
+};
+
+const generateDecimalDivision = (): MathProblem => {
+    // Generate inverse of multiplication to ensure clean answers
+    const ans = getRandomDecimal(1, 10, 1); // Answer e.g. 2.5
+    const divisor = getRandomInt(2, 5); // Divisor e.g. 2
+    const dividend = parseFloat((ans * divisor).toFixed(2)); // 5.0
+    
+    return {
+        question: `${dividend} ÷ ${divisor} = ?`,
+        options: generateOptions(ans, 'number'),
+        correctAnswer: ans.toString(),
+        topic: 'Decimal Division'
+    };
+};
+
+const generateFractionSimplification = (): MathProblem => {
+    // Generate a/b where they share a factor
+    const factor = getRandomInt(2, 5);
+    const num = getRandomInt(1, 5);
+    const den = getRandomInt(num + 1, 9);
+    
+    const bigNum = num * factor;
+    const bigDen = den * factor;
+    
+    const ans = `${num}/${den}`;
+    
+    const options = new Set<string>();
+    options.add(ans);
+    options.add(`${num}/${den+1}`);
+    options.add(`${num+1}/${den}`);
+    options.add(`${bigNum}/${bigDen}`); // The unsimplified one is a distractor
+    
+    // Ensure 4 options
+    while(options.size < 4) {
+        options.add(`${getRandomInt(1,5)}/${getRandomInt(6,9)}`);
+    }
+
+    return {
+        question: `Simplify: ${bigNum}/${bigDen}`,
+        options: Array.from(options).sort(() => Math.random() - 0.5),
+        correctAnswer: ans,
+        topic: 'Simplifying Fractions'
+    };
 };

@@ -8,7 +8,8 @@ import { PlayerComponent } from './Player';
 import { MathModal } from './MathModal';
 import { TutorialModal } from './TutorialModal';
 import { generateProblem, MathProblem } from '../utils/mathGenerator';
-import { Zap, RotateCcw, ScrollText, Shield as ShieldIcon, Target, Coins } from 'lucide-react';
+import { Zap, RotateCcw, ScrollText, Shield as ShieldIcon, Target, Coins, Hand } from 'lucide-react';
+import { HAND_SIZE } from '../constants';
 
 interface CombatProps {
   player: Player;
@@ -20,7 +21,7 @@ interface CombatProps {
   backgroundImage?: string;
 }
 
-type TurnPhase = 'PLAYER' | 'TARGETING' | 'MATH_CHALLENGE' | 'ENEMY_ANIMATING' | 'ENEMY' | 'END';
+type TurnPhase = 'PLAYER' | 'TARGETING' | 'MATH_CHALLENGE' | 'HAND_SELECTION' | 'ENEMY_ANIMATING' | 'ENEMY' | 'END';
 
 interface VisualEffect {
     id: number;
@@ -49,6 +50,9 @@ export const Combat: React.FC<CombatProps> = ({
   const [targetId, setTargetId] = useState<string | null>(null);
   const [activeProblem, setActiveProblem] = useState<MathProblem | null>(null);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+
+  // Hand Selection State (Exhausting/Modifying)
+  const [handSelectionEffect, setHandSelectionEffect] = useState<'exhaust_draw_1' | 'exhaust_draw_2' | 'damage_exhaust' | 'reduce_cost' | null>(null);
   
   // Turn based buffs
   const [turnDamageBonus, setTurnDamageBonus] = useState(0);
@@ -140,7 +144,7 @@ export const Combat: React.FC<CombatProps> = ({
     addLog("--- Player Turn ---");
     setTurnDamageBonus(0);
     setPlayer(prev => {
-        const { deck, discard, hand } = drawCards(prev.drawPile, prev.discardPile, 5);
+        const { deck, discard, hand } = drawCards(prev.drawPile, prev.discardPile, HAND_SIZE);
         return {
             ...prev,
             energy: prev.maxEnergy,
@@ -168,12 +172,72 @@ export const Combat: React.FC<CombatProps> = ({
           'block_damage',
           'damage_discard',
           'damage_x_draw',
-          'block_enemy' // Needs target to see HP
+          'block_enemy', // Needs target to see HP
+          'damage_exhaust' // Mistake Detector needs target
       ].includes(effectId);
+  };
+
+  // When a card is clicked in HAND_SELECTION phase
+  const handleHandCardClick = (targetCard: CardType) => {
+      if (turnPhase !== 'HAND_SELECTION' || !pendingCard || !handSelectionEffect) return;
+
+      // Cannot select the card being played (though theoretically it's still in hand until logic completes, 
+      // but logic-wise we shouldn't exhaust self for cost)
+      if (targetCard.id === pendingCard.id) {
+          triggerVfx("Invalid Target", "info", "player");
+          return;
+      }
+
+      // Execute Selection Effect
+      if (handSelectionEffect === 'exhaust_draw_1' || handSelectionEffect === 'exhaust_draw_2') {
+          const drawCount = handSelectionEffect === 'exhaust_draw_2' ? 2 : 1;
+          setPlayer(p => {
+              // Exhaust: Remove from hand, do not add to discard
+              const remainingHand = p.hand.filter(c => c.id !== targetCard.id);
+              const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, drawCount);
+              
+              triggerVfx("Exhausted!", "info", "player");
+              triggerVfx(`Draw ${drawCount}`, "info", "player");
+              
+              return {
+                  ...p,
+                  hand: [...remainingHand, ...hand],
+                  drawPile: deck,
+                  discardPile: discard
+              };
+          });
+      } else if (handSelectionEffect === 'reduce_cost') {
+          setPlayer(p => ({
+              ...p,
+              hand: p.hand.map(c => c.id === targetCard.id ? { ...c, cost: Math.max(0, c.cost - 1) } : c)
+          }));
+          triggerVfx("Cost Reduced", "info", "player");
+      } else if (handSelectionEffect === 'damage_exhaust') {
+           // Exhaust target card
+           setPlayer(p => ({
+               ...p,
+               hand: p.hand.filter(c => c.id !== targetCard.id)
+           }));
+           triggerVfx("Exhausted!", "info", "player");
+           
+           // Deal damage equal to cost
+           if (targetId) {
+               dealDamage(targetCard.cost + turnDamageBonus, targetId, true);
+           }
+      }
+
+      // Finalize Play
+      finalizeCardPlay(pendingCard);
   };
 
   const handleCardClick = (card: CardType) => {
       if (showTutorial) return; 
+      
+      // If we are selecting a card to exhaust/modify
+      if (turnPhase === 'HAND_SELECTION') {
+          handleHandCardClick(card);
+          return;
+      }
 
       if (player.energy < card.cost) {
           triggerVfx("No Energy!", "info", "player");
@@ -234,28 +298,56 @@ export const Combat: React.FC<CombatProps> = ({
                   triggerVfx("-2 Block", "damage", "player");
                   setPlayer(p => ({...p, block: Math.max(0, p.block - 2)}));
               }
+              
+              setPendingCard(null);
+              setTargetId(null);
+              setActiveProblem(null);
+              setTurnPhase('PLAYER');
           }
       }
-      setPendingCard(null);
-      setTargetId(null);
-      setActiveProblem(null);
-      setTurnPhase('PLAYER');
   };
 
   const playCard = (card: CardType, targetId: string | null) => {
     // 1. Pay Cost
     setPlayer(p => ({ ...p, energy: p.energy - card.cost }));
 
-    // 2. Resolve Effect
-    resolveCardEffect(card, targetId);
+    // 2. Check if Hand Selection is needed
+    if (card.effectId === 'exhaust_1_draw_1') {
+        setHandSelectionEffect('exhaust_draw_1');
+        setTurnPhase('HAND_SELECTION');
+        return; // Wait for selection
+    } else if (card.effectId === 'exhaust_1_draw_2') {
+        setHandSelectionEffect('exhaust_draw_2');
+        setTurnPhase('HAND_SELECTION');
+        return; // Wait for selection
+    } else if (card.effectId === 'reduce_cost') {
+        setHandSelectionEffect('reduce_cost');
+        setTurnPhase('HAND_SELECTION');
+        return; // Wait for selection
+    } else if (card.effectId === 'damage_exhaust') {
+        setHandSelectionEffect('damage_exhaust');
+        setTurnPhase('HAND_SELECTION');
+        return; // Wait for selection
+    }
 
-    // 3. Move to Discard (unless Pop Quiz on success, which behaves normally, only on fail it exhausts)
-    // Actually standard play moves to discard. Pop quiz exhaust is only on FAIL per requirement.
-    setPlayer(p => ({
+    // 3. If no selection needed, resolve immediately
+    resolveCardEffect(card, targetId);
+    finalizeCardPlay(card);
+  };
+
+  const finalizeCardPlay = (card: CardType) => {
+      setPlayer(p => ({
         ...p,
         hand: p.hand.filter(c => c.id !== card.id),
         discardPile: [...p.discardPile, card]
     }));
+    
+    // Reset States
+    setPendingCard(null);
+    setTargetId(null);
+    setActiveProblem(null);
+    setHandSelectionEffect(null);
+    setTurnPhase('PLAYER');
   };
 
   const resolveCardEffect = (card: CardType, targetId: string | null) => {
@@ -265,6 +357,17 @@ export const Combat: React.FC<CombatProps> = ({
     const getTarget = () => enemies.find(e => e.id === targetId);
 
     switch (card.effectId) {
+        case 'chaos_hand':
+             setPlayer(p => {
+                 // Shuffle Hand
+                 const newHand = [...p.hand].sort(() => Math.random() - 0.5);
+                 // Reduce costs
+                 const reducedHand = newHand.map(c => ({ ...c, cost: Math.max(0, c.cost - 1) }));
+                 
+                 triggerVfx("Chaos!", "info", "player");
+                 return { ...p, hand: reducedHand };
+             });
+             return;
         case 'gain_energy':
             setPlayer(p => ({ ...p, energy: p.energy + card.value }));
             triggerVfx(`+${card.value} Energy`, "info", "player");
@@ -572,6 +675,19 @@ export const Combat: React.FC<CombatProps> = ({
           </div>
       )}
 
+      {turnPhase === 'HAND_SELECTION' && (
+           <div className="absolute top-20 left-0 w-full text-center z-50 pointer-events-none">
+              <div className="inline-block bg-black/70 px-8 py-3 rounded-full border-2 border-amber-500 animate-pulse">
+                  <span className="text-2xl font-bold text-amber-100 flex items-center gap-3">
+                      <Hand className="animate-bounce" /> 
+                      {handSelectionEffect === 'exhaust_draw_1' || handSelectionEffect === 'exhaust_draw_2' ? "SELECT CARD TO EXHAUST" : 
+                       handSelectionEffect === 'reduce_cost' ? "SELECT CARD TO MODIFY" : 
+                       "SELECT CARD TO SACRIFICE"}
+                  </span>
+              </div>
+          </div>
+      )}
+
       {effects.map(effect => (
           <div 
             key={effect.id}
@@ -718,6 +834,18 @@ export const Combat: React.FC<CombatProps> = ({
                     </button>
                 </div>
             )}
+            
+            {/* Cancel for Hand Selection */}
+            {turnPhase === 'HAND_SELECTION' && (
+                 <div className="absolute left-1/2 -translate-x-1/2 -top-10 z-30">
+                    <button 
+                        onClick={() => { setTurnPhase('PLAYER'); setPendingCard(null); setHandSelectionEffect(null); }}
+                        className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-1 rounded shadow border border-slate-500"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
 
             {/* Cards Hand */}
             <div className="flex justify-center items-end w-full px-4 md:px-10 pb-2 md:pb-4 h-full overflow-visible">
@@ -757,8 +885,12 @@ export const Combat: React.FC<CombatProps> = ({
                                 <CardComponent 
                                     card={card} 
                                     onClick={handleCardClick}
-                                    disabled={turnPhase !== 'PLAYER' && turnPhase !== 'TARGETING'} 
-                                    playable={player.energy >= card.cost}
+                                    disabled={turnPhase !== 'PLAYER' && turnPhase !== 'TARGETING' && turnPhase !== 'HAND_SELECTION'} 
+                                    playable={
+                                        turnPhase === 'HAND_SELECTION' 
+                                        ? (pendingCard?.id !== card.id) // Can select any card except self in selection mode
+                                        : player.energy >= card.cost // Normal mode
+                                    }
                                     noAnim={true} 
                                 />
                             </div>
