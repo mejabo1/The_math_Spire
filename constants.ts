@@ -1,5 +1,4 @@
 
-
 import { Card, Enemy, MapNode } from './types';
 
 export const INITIAL_PLAYER_HP = 20;
@@ -255,7 +254,7 @@ export const REWARD_POOL_IDS = [
 
 export const STARTING_DECK_IDS = [
   'strike', 'strike', 'strike', 
-  'defend', 'defend',
+  'defend', 'defend', 'defend', // Added a 3rd defend card
   'subtraction',
   'multiply_slam',
   'divided_cleave'
@@ -283,6 +282,7 @@ export const ENEMIES: Enemy[] = [
     name: 'Angry Triangle',
     maxHp: 10,
     currentHp: 10,
+    block: 0,
     intent: { type: 'attack', value: 5 },
     image: SVG_TRIANGLE
   },
@@ -291,6 +291,7 @@ export const ENEMIES: Enemy[] = [
     name: 'Algebra Imp',
     maxHp: 5,
     currentHp: 5,
+    block: 0,
     intent: { type: 'defend', value: 6 },
     image: SVG_ALGEBRA_IMP
   },
@@ -299,15 +300,17 @@ export const ENEMIES: Enemy[] = [
     name: 'Fraction Phantom',
     maxHp: 20,
     currentHp: 20,
+    block: 0,
     intent: { type: 'attack', value: 6 },
     image: SVG_FRACTION_PHANTOM
   },
   {
     id: 'boss_geometry',
     name: 'The Poly-Gone',
-    maxHp: 30, // Lowered from 50
-    currentHp: 30, // Lowered from 50
-    intent: { type: 'attack', value: 5 }, // Raised intent to Attack 5 (was Buff 1)
+    maxHp: 30,
+    currentHp: 30,
+    block: 0,
+    intent: { type: 'attack', value: 5 },
     image: SVG_BOSS_POLYGONE
   }
 ];

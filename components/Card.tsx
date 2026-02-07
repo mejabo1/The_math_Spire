@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { Card as CardType } from '../types';
 import { Sword, Shield, Zap, Sparkles, Minus, X, Divide, CircleSlash } from 'lucide-react';
@@ -42,6 +41,29 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
 
   // Helper to determine icon
   const renderCardIcon = () => {
+    // Unique SVG for Multiply Slam
+    if (card.name === 'Multiply Slam') {
+        return (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 md:w-16 md:h-16 text-yellow-400 drop-shadow-lg">
+                <path d="M18 6L6 18M6 6l12 12" strokeOpacity="0.3" strokeWidth="3" />
+                <path d="M14.5 2l-4.5 4.5l-6-1l1.5 6l4.5 4.5l9-9l-4.5-5z" fill="currentColor" fillOpacity="0.2" />
+                <path d="M6 21h12" strokeWidth="1" strokeOpacity="0.8" />
+            </svg>
+        );
+    }
+
+    // Unique SVG for Divided Cleave
+    if (card.name === 'Divided Cleave') {
+        return (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 md:w-16 md:h-16 text-blue-300 drop-shadow-lg">
+                <circle cx="12" cy="6" r="1.5" fill="currentColor" />
+                <circle cx="12" cy="18" r="1.5" fill="currentColor" />
+                <path d="M5 12h14" strokeOpacity="0.2" strokeWidth="4" />
+                <path d="M21 3L3 21" stroke="white" strokeWidth="3" className="drop-shadow-sm" />
+            </svg>
+        );
+    }
+
     // Specific overrides based on card name or mathType
     if (card.name.includes("Minus") || card.mathType === 'subtraction') {
         return <Minus className="w-8 h-8 md:w-12 md:h-12 opacity-80" />;

@@ -24,7 +24,7 @@ const INITIAL_STATE: GameState = {
         energy: INITIAL_MAX_ENERGY,
         maxEnergy: INITIAL_MAX_ENERGY,
         block: 0,
-        gold: 50, // Start with some gold
+        gold: 10, // Updated starting gold to 10
         deck: [],
         discardPile: [],
         drawPile: [],

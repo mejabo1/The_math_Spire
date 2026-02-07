@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Enemy, Card as CardType } from '../types';
 import { CardComponent } from './Card';
@@ -21,7 +20,7 @@ interface CombatProps {
   backgroundImage?: string;
 }
 
-type TurnPhase = 'PLAYER' | 'TARGETING' | 'MATH_CHALLENGE' | 'HAND_SELECTION' | 'ENEMY_ANIMATING' | 'ENEMY' | 'END';
+type TurnPhase = 'PLAYER' | 'TARGETING' | 'MATH_CHALLENGE' | 'HAND_SELECTION' | 'ENEMY_ANIMATING' | 'ENEMY' | 'END' | 'TRANSITION';
 
 interface VisualEffect {
     id: number;
@@ -31,6 +30,29 @@ interface VisualEffect {
     y: number;
     targetId: string | 'player';
 }
+
+const BOSS_PUNS = [
+    "Stop being so irrational!",
+    "Your strategy is pointless!",
+    "I'm too acute to lose!",
+    "You're just a fraction of my power!",
+    "Don't be such a square!",
+    "I'll divide and conquer you!",
+    "Your logic is full of holes!",
+    "You can't handle my volume!",
+    "Parallel lines never meet... like our skill levels!",
+    "Are you a zero? Because you mean nothing to me!"
+];
+
+const BOSS_ATTACK_TAUNTS = [
+    "I'm about to lower your average!",
+    "Let's subtract some of that HP!",
+    "I hope you're good at division, because I'm splitting you in half!",
+    "Your survival chances are approaching zero!",
+    "Behold, the power of a perfect shape!",
+    "I'm the variable you can't solve!",
+    "Prepare for some long division!"
+];
 
 export const Combat: React.FC<CombatProps> = ({ 
     player: initialPlayer, 
@@ -43,7 +65,7 @@ export const Combat: React.FC<CombatProps> = ({
 }) => {
   const [player, setPlayer] = useState<Player>(initialPlayer);
   const [enemies, setEnemies] = useState<Enemy[]>(initialEnemies);
-  const [turnPhase, setTurnPhase] = useState<TurnPhase>('PLAYER');
+  const [turnPhase, setTurnPhase] = useState<TurnPhase>('TRANSITION');
   
   // Math & Targeting State
   const [pendingCard, setPendingCard] = useState<CardType | null>(null);
@@ -70,6 +92,8 @@ export const Combat: React.FC<CombatProps> = ({
   // Track animation state per enemy ID
   const [enemyAnimStates, setEnemyAnimStates] = useState<Record<string, 'idle' | 'attack' | 'hit'>>({});
   const [enemyFlashes, setEnemyFlashes] = useState<Record<string, boolean>>({});
+  const [enemyTaunts, setEnemyTaunts] = useState<Record<string, string | null>>({});
+  const [bossHitCounter, setBossHitCounter] = useState<Record<string, number>>({});
 
   // Pile Tooltip State
   const [hoveredPile, setHoveredPile] = useState<'draw' | 'discard' | null>(null);
@@ -109,6 +133,13 @@ export const Combat: React.FC<CombatProps> = ({
       }, 500);
   };
 
+  const showEnemyTaunt = (enemyId: string, taunt: string) => {
+      setEnemyTaunts(prev => ({ ...prev, [enemyId]: taunt }));
+      setTimeout(() => {
+          setEnemyTaunts(prev => ({ ...prev, [enemyId]: null }));
+      }, 2500);
+  };
+
   // Auto scroll log
   useEffect(() => {
     if (logContainerRef.current) {
@@ -141,8 +172,12 @@ export const Combat: React.FC<CombatProps> = ({
   };
 
   const startTurn = () => {
-    addLog("--- Player Turn ---");
+    setTurnPhase('TRANSITION');
     setTurnDamageBonus(0);
+    
+    addLog("--- Player Turn ---");
+    // NOTE: Enemy block is NO LONGER cleared here. It is cleared at the start of the ENEMY turn.
+
     setPlayer(prev => {
         const { deck, discard, hand } = drawCards(prev.drawPile, prev.discardPile, HAND_SIZE);
         return {
@@ -177,28 +212,19 @@ export const Combat: React.FC<CombatProps> = ({
       ].includes(effectId);
   };
 
-  // When a card is clicked in HAND_SELECTION phase
   const handleHandCardClick = (targetCard: CardType) => {
       if (turnPhase !== 'HAND_SELECTION' || !pendingCard || !handSelectionEffect) return;
-
-      // Cannot select the card being played (though theoretically it's still in hand until logic completes, 
-      // but logic-wise we shouldn't exhaust self for cost)
       if (targetCard.id === pendingCard.id) {
           triggerVfx("Invalid Target", "info", "player");
           return;
       }
-
-      // Execute Selection Effect
       if (handSelectionEffect === 'exhaust_draw_1' || handSelectionEffect === 'exhaust_draw_2') {
           const drawCount = handSelectionEffect === 'exhaust_draw_2' ? 2 : 1;
           setPlayer(p => {
-              // Exhaust: Remove from hand, do not add to discard
               const remainingHand = p.hand.filter(c => c.id !== targetCard.id);
               const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, drawCount);
-              
               triggerVfx("Exhausted!", "info", "player");
               triggerVfx(`Draw ${drawCount}`, "info", "player");
-              
               return {
                   ...p,
                   hand: [...remainingHand, ...hand],
@@ -213,51 +239,36 @@ export const Combat: React.FC<CombatProps> = ({
           }));
           triggerVfx("Cost Reduced", "info", "player");
       } else if (handSelectionEffect === 'damage_exhaust') {
-           // Exhaust target card
            setPlayer(p => ({
                ...p,
                hand: p.hand.filter(c => c.id !== targetCard.id)
            }));
            triggerVfx("Exhausted!", "info", "player");
-           
-           // Deal damage equal to cost
-           if (targetId) {
-               dealDamage(targetCard.cost + turnDamageBonus, targetId, true);
-           }
+           if (targetId) dealDamage(targetCard.cost + turnDamageBonus, targetId, true);
       }
-
-      // Finalize Play
       finalizeCardPlay(pendingCard);
   };
 
   const handleCardClick = (card: CardType) => {
       if (showTutorial) return; 
-      
-      // If we are selecting a card to exhaust/modify
       if (turnPhase === 'HAND_SELECTION') {
           handleHandCardClick(card);
           return;
       }
-
       if (player.energy < card.cost) {
           triggerVfx("No Energy!", "info", "player");
           return;
       }
-      
       const needsTarget = isTargetedEffect(card.effectId);
       const livingEnemies = enemies.filter(e => e.currentHp > 0);
-
       if (needsTarget && livingEnemies.length > 1) {
           setPendingCard(card);
           setTurnPhase('TARGETING');
           addLog("Select a target...");
       } else {
           setPendingCard(card);
-          if (needsTarget && livingEnemies.length === 1) {
-              setTargetId(livingEnemies[0].id);
-          } else {
-              setTargetId(null);
-          }
+          if (needsTarget && livingEnemies.length === 1) setTargetId(livingEnemies[0].id);
+          else setTargetId(null);
           setActiveProblem(generateProblem(card.mathType));
           setTurnPhase('MATH_CHALLENGE');
       }
@@ -265,7 +276,6 @@ export const Combat: React.FC<CombatProps> = ({
 
   const handleEnemyClick = (enemy: Enemy) => {
       if (showTutorial) return;
-
       if (turnPhase === 'TARGETING' && enemy.currentHp > 0) {
           setTargetId(enemy.id);
           setActiveProblem(generateProblem(pendingCard?.mathType));
@@ -278,27 +288,21 @@ export const Combat: React.FC<CombatProps> = ({
           if (correct) {
               playCard(pendingCard, targetId);
           } else {
-              // Failed Calculation
               setPlayer(p => {
-                  // If it's Pop Quiz, it exhausts (disappears) on wrong answer
                   const isPopQuiz = pendingCard.name === 'Pop Quiz';
-                  
                   return {
                      ...p,
                      energy: p.energy - pendingCard.cost,
                      hand: p.hand.filter(c => c.id !== pendingCard.id),
-                     // Only add to discard if NOT Pop Quiz
                      discardPile: isPopQuiz ? p.discardPile : [...p.discardPile, pendingCard]
                   };
               });
-
               addLog("Calculation Failed! Energy lost.");
               triggerVfx("Fizzle...", "info", "player");
               if (pendingCard.name === 'Order of Ops') {
                   triggerVfx("-2 Block", "damage", "player");
                   setPlayer(p => ({...p, block: Math.max(0, p.block - 2)}));
               }
-              
               setPendingCard(null);
               setTargetId(null);
               setActiveProblem(null);
@@ -308,29 +312,15 @@ export const Combat: React.FC<CombatProps> = ({
   };
 
   const playCard = (card: CardType, targetId: string | null) => {
-    // 1. Pay Cost
     setPlayer(p => ({ ...p, energy: p.energy - card.cost }));
-
-    // 2. Check if Hand Selection is needed
-    if (card.effectId === 'exhaust_1_draw_1') {
-        setHandSelectionEffect('exhaust_draw_1');
+    if (['exhaust_1_draw_1', 'exhaust_1_draw_2', 'reduce_cost', 'damage_exhaust'].includes(card.effectId)) {
+        if (card.effectId === 'exhaust_1_draw_1') setHandSelectionEffect('exhaust_draw_1');
+        else if (card.effectId === 'exhaust_1_draw_2') setHandSelectionEffect('exhaust_draw_2');
+        else if (card.effectId === 'reduce_cost') setHandSelectionEffect('reduce_cost');
+        else if (card.effectId === 'damage_exhaust') setHandSelectionEffect('damage_exhaust');
         setTurnPhase('HAND_SELECTION');
-        return; // Wait for selection
-    } else if (card.effectId === 'exhaust_1_draw_2') {
-        setHandSelectionEffect('exhaust_draw_2');
-        setTurnPhase('HAND_SELECTION');
-        return; // Wait for selection
-    } else if (card.effectId === 'reduce_cost') {
-        setHandSelectionEffect('reduce_cost');
-        setTurnPhase('HAND_SELECTION');
-        return; // Wait for selection
-    } else if (card.effectId === 'damage_exhaust') {
-        setHandSelectionEffect('damage_exhaust');
-        setTurnPhase('HAND_SELECTION');
-        return; // Wait for selection
+        return;
     }
-
-    // 3. If no selection needed, resolve immediately
     resolveCardEffect(card, targetId);
     finalizeCardPlay(card);
   };
@@ -341,8 +331,6 @@ export const Combat: React.FC<CombatProps> = ({
         hand: p.hand.filter(c => c.id !== card.id),
         discardPile: [...p.discardPile, card]
     }));
-    
-    // Reset States
     setPendingCard(null);
     setTargetId(null);
     setActiveProblem(null);
@@ -353,17 +341,12 @@ export const Combat: React.FC<CombatProps> = ({
   const resolveCardEffect = (card: CardType, targetId: string | null) => {
     let damage = card.value + turnDamageBonus;
     let block = card.value;
-
     const getTarget = () => enemies.find(e => e.id === targetId);
-
     switch (card.effectId) {
         case 'chaos_hand':
              setPlayer(p => {
-                 // Shuffle Hand
                  const newHand = [...p.hand].sort(() => Math.random() - 0.5);
-                 // Reduce costs
                  const reducedHand = newHand.map(c => ({ ...c, cost: Math.max(0, c.cost - 1) }));
-                 
                  triggerVfx("Chaos!", "info", "player");
                  return { ...p, hand: reducedHand };
              });
@@ -383,8 +366,6 @@ export const Combat: React.FC<CombatProps> = ({
             setPlayer(p => {
                 const amt = Math.max(0, p.hand.length - 1) + turnDamageBonus;
                 if (targetId) dealDamage(amt, targetId, true);
-                
-                // Draw 1
                 const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, 1);
                 triggerVfx("Draw 1", "info", "player");
                 return { ...p, drawPile: deck, discardPile: discard, hand: [...p.hand, ...hand] };
@@ -393,7 +374,7 @@ export const Combat: React.FC<CombatProps> = ({
         case 'block_enemy':
             const target = getTarget();
             if (target) {
-                const amt = target.currentHp; // "Equal to opponent"
+                const amt = target.currentHp;
                 triggerVfx(`+${amt} Block`, "block", "player");
                 setPlayer(p => ({ ...p, block: p.block + amt }));
             }
@@ -410,9 +391,7 @@ export const Combat: React.FC<CombatProps> = ({
             triggerVfx(`${damage} Block Slam!`, "info", "player");
             break;
         case 'damage_all':
-             enemies.forEach(e => {
-                 if (e.currentHp > 0) dealDamage(damage, e.id, true);
-             });
+             enemies.forEach(e => { if (e.currentHp > 0) dealDamage(damage, e.id, true); });
              return; 
         case 'draw_cards':
             setPlayer(p => {
@@ -425,14 +404,10 @@ export const Combat: React.FC<CombatProps> = ({
             const t = getTarget();
              const isPrime = (num: number) => {
                 if (num <= 1) return false;
-                for(let i = 2, s = Math.sqrt(num); i <= s; i++)
-                    if(num % i === 0) return false; 
+                for(let i = 2, s = Math.sqrt(num); i <= s; i++) if(num % i === 0) return false; 
                 return true;
             }
-            if (t && isPrime(t.currentHp)) {
-                damage *= 2;
-                triggerVfx("CRITICAL!", "damage", t.id);
-            }
+            if (t && isPrime(t.currentHp)) { damage *= 2; triggerVfx("CRITICAL!", "damage", t.id); }
             break;
         case 'multi_hit':
              damage = card.value + turnDamageBonus;
@@ -442,7 +417,7 @@ export const Combat: React.FC<CombatProps> = ({
                 setTimeout(() => dealDamage(damage, targetId, true), 500);
              }
              return;
-        case 'multi_hit_2': // Chain calculation
+        case 'multi_hit_2':
              damage = card.value + turnDamageBonus;
              if (targetId) {
                 setTimeout(() => dealDamage(damage, targetId, true), 100);
@@ -467,17 +442,15 @@ export const Combat: React.FC<CombatProps> = ({
             return;
         case 'reckless_attack':
             setPlayer(p => {
-                const selfDmg = 1; 
-                triggerVfx(`-${selfDmg}`, "damage", "player");
+                triggerVfx(`-1`, "damage", "player");
                 triggerPlayerShake();
-                return { ...p, currentHp: Math.max(1, p.currentHp - selfDmg) };
+                return { ...p, currentHp: Math.max(1, p.currentHp - 1) };
             });
             break;
         case 'lifesteal':
              setPlayer(p => {
-                 const heal = 1;
-                 triggerVfx(`+${heal}`, "info", "player");
-                 return { ...p, currentHp: Math.min(p.maxHp, p.currentHp + heal) };
+                 triggerVfx(`+1`, "info", "player");
+                 return { ...p, currentHp: Math.min(p.maxHp, p.currentHp + 1) };
              });
              break;
         case 'block_draw':
@@ -503,11 +476,7 @@ export const Combat: React.FC<CombatProps> = ({
              });
              return;
         case 'block_damage':
-             setPlayer(p => {
-                 triggerVfx("Keep Change!", "info", "player"); 
-                 triggerVfx(`+1`, "block", "player");
-                 return { ...p, block: p.block + 1 };
-             });
+             setPlayer(p => { triggerVfx(`+1`, "block", "player"); return { ...p, block: p.block + 1 }; });
              damage = 2 + turnDamageBonus; 
              if (targetId) dealDamage(damage, targetId, true);
              return;
@@ -519,18 +488,12 @@ export const Combat: React.FC<CombatProps> = ({
                  const randomIdx = Math.floor(Math.random() * otherCards.length);
                  const toDiscard = otherCards[randomIdx];
                  triggerVfx("Discarded!", "info", "player");
-                 return {
-                     ...p,
-                     hand: p.hand.filter(c => c.id !== toDiscard.id), 
-                     discardPile: [...p.discardPile, toDiscard]
-                 };
+                 return { ...p, hand: p.hand.filter(c => c.id !== toDiscard.id), discardPile: [...p.discardPile, toDiscard] };
              });
              return;
     }
-
-    if (isTargetedEffect(card.effectId) && targetId) {
-        dealDamage(damage, targetId, true); 
-    } else if (card.type === 'skill' && (card.effectId === 'gain_block' || card.effectId === 'gain_block_heavy')) {
+    if (isTargetedEffect(card.effectId) && targetId) dealDamage(damage, targetId, true); 
+    else if (card.type === 'skill' && (card.effectId === 'gain_block' || card.effectId === 'gain_block_heavy')) {
         setPlayer(p => ({ ...p, block: p.block + block }));
         triggerVfx(<ShieldIcon size={40} className="text-blue-400 fill-blue-900/50" />, "block", "player");
         triggerVfx(`+${block}`, "info", "player");
@@ -541,10 +504,37 @@ export const Combat: React.FC<CombatProps> = ({
     if (isPlayerSource) {
         setEnemies(prev => prev.map(e => {
             if (e.id === targetId) {
-                const newHp = e.currentHp - amount;
-                triggerVfx(amount.toString(), "damage", e.id);
+                const blocked = Math.min(e.block, amount);
+                const unblocked = amount - blocked;
+                const newHp = e.currentHp - unblocked;
+                
+                if (blocked > 0) {
+                    triggerVfx(`Blocked ${blocked}`, "block", e.id);
+                }
+                if (unblocked > 0) {
+                    triggerVfx(unblocked.toString(), "damage", e.id);
+                } else if (amount > 0 && unblocked === 0) {
+                    triggerVfx("Blocked!", "block", e.id);
+                }
+
                 triggerEnemyShake(e.id);
-                return { ...e, currentHp: newHp };
+                
+                // Boss Taunt Logic
+                if (e.id.includes('boss')) {
+                    const currentHitCount = (bossHitCounter[e.id] || 0) + 1;
+                    setBossHitCounter(prev => ({ ...prev, [e.id]: currentHitCount }));
+
+                    let taunt: string | null = null;
+                    if (newHp > 0 && newHp < 10) {
+                        taunt = "What manner of creature are you!?";
+                    } else if (currentHitCount % 3 === 0) {
+                        taunt = BOSS_PUNS[Math.floor(Math.random() * BOSS_PUNS.length)];
+                    }
+
+                    if (taunt) showEnemyTaunt(e.id, taunt);
+                }
+
+                return { ...e, block: e.block - blocked, currentHp: newHp };
             }
             return e;
         }));
@@ -557,17 +547,9 @@ export const Combat: React.FC<CombatProps> = ({
                 setPlayerBlockAnim(true);
                 setTimeout(() => setPlayerBlockAnim(false), 600); 
             }
-            if (unblocked > 0) {
-                triggerVfx(unblocked.toString(), "damage", "player");
-                triggerPlayerShake();
-            } else {
-                triggerVfx("Blocked!", "block", "player");
-            }
-            return {
-                ...prev,
-                block: prev.block - blocked,
-                currentHp: prev.currentHp - unblocked
-            };
+            if (unblocked > 0) { triggerVfx(unblocked.toString(), "damage", "player"); triggerPlayerShake(); }
+            else { triggerVfx("Blocked!", "block", "player"); }
+            return { ...prev, block: prev.block - blocked, currentHp: prev.currentHp - unblocked };
         });
     }
   };
@@ -581,24 +563,22 @@ export const Combat: React.FC<CombatProps> = ({
   }, [enemies, onVictory, player.currentHp]);
 
   useEffect(() => {
-    if (player.currentHp <= 0) {
-        setTurnPhase('END');
-        onDefeat();
-    }
+    if (player.currentHp <= 0) { setTurnPhase('END'); onDefeat(); }
   }, [player.currentHp, onDefeat]);
 
   const endTurn = async () => {
     setTurnPhase('ENEMY_ANIMATING');
     addLog("--- Enemy Turn ---");
+    
+    // NEW: Clear enemy block at the START of the enemy phase
+    setEnemies(prev => prev.map(e => ({ ...e, block: 0 })));
+
     const livingEnemies = enemies.filter(e => e.currentHp > 0);
-    for (const enemy of livingEnemies) {
-        await processEnemyTurn(enemy);
-    }
+    for (const enemy of livingEnemies) await processEnemyTurn(enemy);
     setEnemies(prev => prev.map(e => {
         if (e.currentHp > 0) return { ...e, intent: getRandomIntent(e) };
         return e;
     }));
-    setTurnPhase('PLAYER'); 
     startTurn();
   };
 
@@ -607,19 +587,21 @@ export const Combat: React.FC<CombatProps> = ({
         setTimeout(() => {
             const intent = enemy.intent;
             if (intent.type === 'attack') {
+                if (enemy.id.includes('boss')) {
+                    showEnemyTaunt(enemy.id, BOSS_ATTACK_TAUNTS[Math.floor(Math.random() * BOSS_ATTACK_TAUNTS.length)]);
+                }
                 setEnemyAnimStates(prev => ({ ...prev, [enemy.id]: 'attack' }));
                 setTimeout(() => {
                     dealDamage(intent.value, 'player', false); 
                     setEnemyAnimStates(prev => ({ ...prev, [enemy.id]: 'idle' }));
                     resolve();
                 }, 500);
+            } else if (intent.type === 'defend') { 
+                addLog(`${enemy.name} gains ${intent.value} block.`); 
+                triggerVfx(`+${intent.value} Block`, "block", enemy.id);
+                setEnemies(prev => prev.map(e => e.id === enemy.id ? { ...e, block: e.block + intent.value } : e));
+                setTimeout(resolve, 500);
             } else {
-                if (intent.type === 'defend') {
-                    addLog(`${enemy.name} gains block.`);
-                    triggerVfx("Shield Up", "block", enemy.id);
-                } else if (intent.type === 'buff') {
-                    triggerVfx("Buff!", "info", enemy.id);
-                }
                 setTimeout(resolve, 500);
             }
         }, 600);
@@ -627,33 +609,22 @@ export const Combat: React.FC<CombatProps> = ({
   };
 
   const getRandomIntent = (enemy?: Enemy) => {
-      // Boss Logic: Prioritize heavy hits
       if (enemy && enemy.id.includes('boss')) {
           const r = Math.random();
-          if (r > 0.4) return { type: 'attack' as const, value: 5 }; // 60% chance to hit for 5
-          if (r > 0.2) return { type: 'defend' as const, value: 5 }; // 20% chance to defend
-          return { type: 'buff' as const, value: 2 }; // 20% chance to buff
+          // Boss now only Attacks or Defends
+          if (r > 0.5) return { type: 'attack' as const, value: 5 };
+          return { type: 'defend' as const, value: 5 };
       }
-
-      // Standard Enemy Logic
       const r = Math.random();
-      if (r > 0.6) return { type: 'attack' as const, value: Math.floor(Math.random() * 2) + 1 };
-      if (r > 0.3) return { type: 'defend' as const, value: 3 };
-      return { type: 'attack' as const, value: 4 };
+      // Regular enemies also simplified to remove Buffs
+      if (r > 0.5) return { type: 'attack' as const, value: Math.floor(Math.random() * 2) + 1 };
+      return { type: 'defend' as const, value: 3 };
   };
 
-  // ... Render ...
   return (
     <div className="h-full flex flex-row relative overflow-hidden bg-slate-900 select-none">
       {/* Background Layer */}
-      {backgroundImage ? (
-          <div className="absolute inset-0 z-0">
-              <img src={backgroundImage} alt="Battle Background" className="w-full h-full object-cover opacity-60" />
-              <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-transparent to-black/80"></div>
-          </div>
-      ) : (
-          <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-black"></div>
-      )}
+      <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-black"></div>
 
       {showTutorial && <TutorialModal onClose={onTutorialComplete} />}
 
@@ -701,12 +672,10 @@ export const Combat: React.FC<CombatProps> = ({
       
       {playerFlash && <div className="absolute inset-0 bg-red-500/20 z-40 animate-flash-hit pointer-events-none" />}
 
-      {/* LEFT PANEL: Combat Arena + Hand */}
+      {/* ARENA */}
       <div className="flex-1 flex flex-col justify-between p-2 md:p-4 relative z-10">
         
-        {/* UPPER ARENA: Player & Enemies */}
         <div className="flex-1 flex items-center justify-between px-4 md:px-12 relative pt-4 md:pt-10">
-            {/* Player Side */}
             <div className={`transition-transform duration-100 ${playerShake ? 'translate-x-[-10px] grayscale' : ''}`}>
                  <div className="relative">
                       {turnDamageBonus > 0 && (
@@ -720,7 +689,6 @@ export const Combat: React.FC<CombatProps> = ({
                  </div>
             </div>
 
-            {/* Enemy Side */}
             <div className="flex items-end justify-center gap-1 md:gap-4 min-w-[150px] md:min-w-[300px]">
                 {enemies.filter(e => e.currentHp > 0).map(enemy => (
                     <div key={enemy.id} className="relative">
@@ -730,16 +698,15 @@ export const Combat: React.FC<CombatProps> = ({
                             animationState={enemyAnimStates[enemy.id]} 
                             isTargetable={turnPhase === 'TARGETING'}
                             onClick={() => handleEnemyClick(enemy)}
+                            taunt={enemyTaunts[enemy.id]}
                         />
                     </div>
                 ))}
             </div>
         </div>
 
-        {/* LOWER AREA: Hand & UI */}
+        {/* HAND */}
         <div className="h-[30%] min-h-[200px] max-h-[280px] flex flex-col justify-end relative z-20">
-            
-            {/* Energy Indicator */}
             <div className="absolute left-2 md:left-10 top-0 z-20 flex flex-col items-center gap-2">
                 <div className="relative group">
                     <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center border-4 border-amber-200">
@@ -747,107 +714,30 @@ export const Combat: React.FC<CombatProps> = ({
                         <span className="text-xl md:text-3xl font-bold text-white drop-shadow-md ml-1">{player.energy}/{player.maxEnergy}</span>
                     </div>
                 </div>
-                
-                {/* Gold Indicator Added Here for Visibility during Combat */}
                 <div className="bg-black/60 px-2 py-1 rounded-full border border-yellow-500/30 text-yellow-400 flex items-center gap-1 text-xs md:text-sm font-bold">
                     <Coins size={14} /> {player.gold}
                 </div>
             </div>
 
-            {/* Deck Counts */}
             <div className="absolute left-2 md:left-4 bottom-2 md:bottom-4 text-[10px] md:text-xs font-bold text-slate-500 flex flex-col gap-1 z-30">
-                {/* Draw Pile */}
-                <div 
-                    className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative"
-                    onMouseEnter={() => setHoveredPile('draw')}
-                    onMouseLeave={() => setHoveredPile(null)}
-                >
+                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative" onMouseEnter={() => setHoveredPile('draw')} onMouseLeave={() => setHoveredPile(null)}>
                     Draw: {player.drawPile.length}
-                    {hoveredPile === 'draw' && (
-                        <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-xl text-slate-200 pointer-events-none z-50">
-                            <h4 className="text-amber-500 font-serif border-b border-slate-600 pb-1 mb-2">Draw Pile</h4>
-                            {player.drawPile.length === 0 ? <span className="italic text-slate-500">Empty</span> : (
-                                <ul className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
-                                    {Object.entries(player.drawPile.reduce((acc, card) => {
-                                        const name = card.name;
-                                        acc[name] = (acc[name] || 0) + 1;
-                                        return acc;
-                                    }, {} as Record<string, number>)).sort((a,b) => a[0].localeCompare(b[0])).map(([name, count]) => (
-                                        <li key={name} className="flex justify-between">
-                                            <span className="truncate mr-2">{name}</span>
-                                            <span className="text-slate-500">x{count}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    )}
                 </div>
-
-                {/* Discard Pile */}
-                <div 
-                    className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative"
-                    onMouseEnter={() => setHoveredPile('discard')}
-                    onMouseLeave={() => setHoveredPile(null)}
-                >
+                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative" onMouseEnter={() => setHoveredPile('discard')} onMouseLeave={() => setHoveredPile(null)}>
                     Discard: {player.discardPile.length}
-                    {hoveredPile === 'discard' && (
-                        <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-xl text-slate-200 pointer-events-none z-50">
-                            <h4 className="text-amber-500 font-serif border-b border-slate-600 pb-1 mb-2">Discard Pile</h4>
-                            {player.discardPile.length === 0 ? <span className="italic text-slate-500">Empty</span> : (
-                                <ul className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
-                                    {Object.entries(player.discardPile.reduce((acc, card) => {
-                                        const name = card.name;
-                                        acc[name] = (acc[name] || 0) + 1;
-                                        return acc;
-                                    }, {} as Record<string, number>)).sort((a,b) => a[0].localeCompare(b[0])).map(([name, count]) => (
-                                        <li key={name} className="flex justify-between">
-                                            <span className="truncate mr-2">{name}</span>
-                                            <span className="text-slate-500">x{count}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    )}
                 </div>
             </div>
 
-            {/* End Turn Button */}
             <div className="absolute right-2 md:right-4 top-0 z-20">
                 <button 
                     disabled={turnPhase !== 'PLAYER' || showTutorial}
                     onClick={endTurn}
-                    className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-2 px-4 md:py-3 md:px-8 rounded-full shadow-lg border-2 border-amber-400 disabled:border-slate-600 transition-all active:scale-95 flex items-center gap-2 hover:shadow-amber-500/20 text-xs md:text-base"
+                    className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-2 px-4 md:py-3 md:px-8 rounded-full shadow-lg border-2 border-amber-400 disabled:border-slate-600 transition-all active:scale-95 flex items-center gap-2 hover:shadow-amber-500/20 text-xs md:text-base cursor-pointer"
                 >
                     End Turn <RotateCcw size={16} />
                 </button>
             </div>
 
-            {turnPhase === 'TARGETING' && (
-                <div className="absolute left-1/2 -translate-x-1/2 -top-10 z-30">
-                    <button 
-                        onClick={() => { setTurnPhase('PLAYER'); setPendingCard(null); }}
-                        className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-1 rounded shadow border border-slate-500"
-                    >
-                        Cancel Selection
-                    </button>
-                </div>
-            )}
-            
-            {/* Cancel for Hand Selection */}
-            {turnPhase === 'HAND_SELECTION' && (
-                 <div className="absolute left-1/2 -translate-x-1/2 -top-10 z-30">
-                    <button 
-                        onClick={() => { setTurnPhase('PLAYER'); setPendingCard(null); setHandSelectionEffect(null); }}
-                        className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-1 rounded shadow border border-slate-500"
-                    >
-                        Cancel
-                    </button>
-                </div>
-            )}
-
-            {/* Cards Hand */}
             <div className="flex justify-center items-end w-full px-4 md:px-10 pb-2 md:pb-4 h-full overflow-visible">
                 {player.hand.map((card, idx) => {
                     const totalCards = player.hand.length;
@@ -857,11 +747,7 @@ export const Combat: React.FC<CombatProps> = ({
                     const translateY = Math.abs(offset) * 10; 
                     const isSelected = pendingCard?.id === card.id;
                     const isHovered = hoveredCardId === card.id;
-
-                    // Dynamically calculate negative margin based on card count to squeeze them if needed
-                    // Default overlap -35px, but more squeeze if many cards
                     const squeeze = totalCards > 5 ? -45 : -25;
-
                     const style = {
                         marginLeft: idx === 0 ? 0 : `${squeeze}px`,
                         zIndex: isSelected ? 50 : (isHovered ? 40 : idx),
@@ -874,23 +760,13 @@ export const Combat: React.FC<CombatProps> = ({
                     };
 
                     return (
-                        <div 
-                            key={card.id + idx} 
-                            style={style}
-                            onMouseEnter={() => setHoveredCardId(card.id)}
-                            onMouseLeave={() => setHoveredCardId(null)}
-                            className="relative origin-bottom shrink-0"
-                        >
-                            <div className="animate-card-enter" style={{ animationDelay: `${idx * 100}ms` }}>
+                        <div key={card.id} style={style} onMouseEnter={() => setHoveredCardId(card.id)} onMouseLeave={() => setHoveredCardId(null)} className="relative origin-bottom shrink-0">
+                            <div className="animate-card-deal" style={{ animationDelay: `${idx * 150}ms` }}>
                                 <CardComponent 
                                     card={card} 
                                     onClick={handleCardClick}
                                     disabled={turnPhase !== 'PLAYER' && turnPhase !== 'TARGETING' && turnPhase !== 'HAND_SELECTION'} 
-                                    playable={
-                                        turnPhase === 'HAND_SELECTION' 
-                                        ? (pendingCard?.id !== card.id) // Can select any card except self in selection mode
-                                        : player.energy >= card.cost // Normal mode
-                                    }
+                                    playable={turnPhase === 'HAND_SELECTION' ? (pendingCard?.id !== card.id) : player.energy >= card.cost}
                                     noAnim={true} 
                                 />
                             </div>
@@ -901,20 +777,15 @@ export const Combat: React.FC<CombatProps> = ({
         </div>
       </div>
 
-      {/* RIGHT PANEL: Combat Log (Hidden on small screens, or toggleable) */}
+      {/* LOG */}
       <div className="hidden lg:flex w-64 xl:w-72 h-full bg-slate-950/80 border-l border-slate-800 p-4 flex-col backdrop-blur-md relative z-10 shrink-0">
           <div className="flex items-center gap-2 mb-4 text-amber-500 border-b border-slate-800 pb-2">
               <ScrollText size={20} />
               <h3 className="font-serif font-bold uppercase tracking-wider text-sm">Combat Log</h3>
           </div>
-          <div 
-            ref={logContainerRef}
-            className="flex-1 overflow-y-auto space-y-3 text-sm text-slate-400 pr-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
-          >
+          <div ref={logContainerRef} className="flex-1 overflow-y-auto space-y-3 text-sm text-slate-400 pr-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
               {combatLog.map((log, i) => (
-                  <div key={i} className="animate-fade-in border-l-2 border-slate-700 pl-2 py-1 leading-snug">
-                      {log}
-                  </div>
+                  <div key={i} className="animate-fade-in border-l-2 border-slate-700 pl-2 py-1 leading-snug">{log}</div>
               ))}
           </div>
       </div>
