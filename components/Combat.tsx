@@ -61,7 +61,6 @@ export const Combat: React.FC<CombatProps> = ({
     onDefeat,
     showTutorial,
     onTutorialComplete,
-    backgroundImage
 }) => {
   const [player, setPlayer] = useState<Player>(initialPlayer);
   const [enemies, setEnemies] = useState<Enemy[]>(initialEnemies);
@@ -94,9 +93,6 @@ export const Combat: React.FC<CombatProps> = ({
   const [enemyFlashes, setEnemyFlashes] = useState<Record<string, boolean>>({});
   const [enemyTaunts, setEnemyTaunts] = useState<Record<string, string | null>>({});
   const [bossHitCounter, setBossHitCounter] = useState<Record<string, number>>({});
-
-  // Pile Tooltip State
-  const [hoveredPile, setHoveredPile] = useState<'draw' | 'discard' | null>(null);
 
   const addLog = (message: string) => {
       setCombatLog(prev => [...prev, message]);
@@ -720,10 +716,10 @@ export const Combat: React.FC<CombatProps> = ({
             </div>
 
             <div className="absolute left-2 md:left-4 bottom-2 md:bottom-4 text-[10px] md:text-xs font-bold text-slate-500 flex flex-col gap-1 z-30">
-                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative" onMouseEnter={() => setHoveredPile('draw')} onMouseLeave={() => setHoveredPile(null)}>
+                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative">
                     Draw: {player.drawPile.length}
                 </div>
-                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative" onMouseEnter={() => setHoveredPile('discard')} onMouseLeave={() => setHoveredPile(null)}>
+                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative">
                     Discard: {player.discardPile.length}
                 </div>
             </div>
