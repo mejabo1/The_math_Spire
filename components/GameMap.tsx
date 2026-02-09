@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { MapNode } from '../types';
 import { Skull, HelpCircle, MapPin, Tent, Crown } from 'lucide-react';
@@ -107,8 +106,6 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
                             top: `${node.y}%`, 
                             position: 'absolute',
                             transform: 'translate(-50%, -50%)',
-                            width: '40px',
-                            height: '40px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',

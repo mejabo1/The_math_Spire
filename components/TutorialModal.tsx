@@ -1,15 +1,16 @@
 
 import React, { useState } from 'react';
-import { ChevronRight, Zap, Brain, Shield, Sword, X, RefreshCw, Layers } from 'lucide-react';
+import { ChevronRight, Zap, Brain, Shield, Sword, X, RefreshCw, Layers, FlaskConical } from 'lucide-react';
 
 interface TutorialModalProps {
   onClose: () => void;
+  type?: 'intro' | 'poison';
 }
 
-export const TutorialModal: React.FC<TutorialModalProps> = ({ onClose }) => {
+export const TutorialModal: React.FC<TutorialModalProps> = ({ onClose, type = 'intro' }) => {
   const [step, setStep] = useState(0);
 
-  const steps = [
+  const introSteps = [
     {
       title: "Welcome to Math Spire",
       content: "Climb the spire by defeating enemies using deck-building strategies and 6th-grade math skills.",
@@ -53,6 +54,26 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ onClose }) => {
       )
     }
   ];
+
+  const poisonSteps = [
+    {
+      title: "New Danger: Poison",
+      content: "Tier 2 introduces Venomous enemies. They can apply Poison to you.",
+      icon: <FlaskConical size={64} className="text-green-500" />
+    },
+    {
+      title: "How Poison Works",
+      content: "You take damage equal to your Poison amount at the START of your turn. The Poison amount then decreases by 1.",
+      icon: (
+        <div className="flex flex-col items-center gap-2">
+            <div className="text-4xl font-bold text-green-400">Start Turn</div>
+            <div className="text-2xl text-red-400 animate-pulse">-X HP</div>
+        </div>
+      )
+    }
+  ];
+
+  const steps = type === 'poison' ? poisonSteps : introSteps;
 
   const handleNext = () => {
     if (step < steps.length - 1) {

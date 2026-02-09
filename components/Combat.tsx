@@ -7,6 +7,7 @@ import { PlayerComponent } from './Player';
 import { MathModal } from './MathModal';
 import { TutorialModal } from './TutorialModal';
 import { generateProblem, MathProblem } from '../utils/mathGenerator';
+import { BOSS_PUNS, BOSS_ATTACK_TAUNTS, drawCards, getEffectTargetType } from '../utils/combatUtils';
 import { Zap, RotateCcw, ScrollText, Shield as ShieldIcon, Target, Coins, Hand } from 'lucide-react';
 import { HAND_SIZE } from '../constants';
 
@@ -18,6 +19,8 @@ interface CombatProps {
   showTutorial: boolean;
   onTutorialComplete: () => void;
   backgroundImage?: string;
+  tier?: number;
+  tutorialType?: 'intro' | 'poison';
 }
 
 type TurnPhase = 'PLAYER' | 'TARGETING' | 'MATH_CHALLENGE' | 'HAND_SELECTION' | 'ENEMY_ANIMATING' | 'ENEMY' | 'END' | 'TRANSITION';
@@ -31,29 +34,6 @@ interface VisualEffect {
     targetId: string | 'player';
 }
 
-const BOSS_PUNS = [
-    "Stop being so irrational!",
-    "Your strategy is pointless!",
-    "I'm too acute to lose!",
-    "You're just a fraction of my power!",
-    "Don't be such a square!",
-    "I'll divide and conquer you!",
-    "Your logic is full of holes!",
-    "You can't handle my volume!",
-    "Parallel lines never meet... like our skill levels!",
-    "Are you a zero? Because you mean nothing to me!"
-];
-
-const BOSS_ATTACK_TAUNTS = [
-    "I'm about to lower your average!",
-    "Let's subtract some of that HP!",
-    "I hope you're good at division, because I'm splitting you in half!",
-    "Your survival chances are approaching zero!",
-    "Behold, the power of a perfect shape!",
-    "I'm the variable you can't solve!",
-    "Prepare for some long division!"
-];
-
 export const Combat: React.FC<CombatProps> = ({ 
     player: initialPlayer, 
     enemies: initialEnemies, 
@@ -61,6 +41,8 @@ export const Combat: React.FC<CombatProps> = ({
     onDefeat,
     showTutorial,
     onTutorialComplete,
+    tier = 1,
+    tutorialType = 'intro'
 }) => {
   const [player, setPlayer] = useState<Player>(initialPlayer);
   const [enemies, setEnemies] = useState<Enemy[]>(initialEnemies);
@@ -149,35 +131,31 @@ export const Combat: React.FC<CombatProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const drawCards = (currentDeck: CardType[], currentDiscard: CardType[], amount: number) => {
-    let deck = [...currentDeck];
-    let discard = [...currentDiscard];
-    let hand: CardType[] = [];
-
-    for (let i = 0; i < amount; i++) {
-        if (deck.length === 0) {
-            if (discard.length === 0) break;
-            deck = [...discard].sort(() => Math.random() - 0.5);
-            discard = [];
-            addLog("Deck shuffled.");
-        }
-        const card = deck.pop();
-        if (card) hand.push(card);
-    }
-    return { deck, discard, hand };
-  };
-
   const startTurn = () => {
     setTurnPhase('TRANSITION');
     setTurnDamageBonus(0);
     
     addLog("--- Player Turn ---");
-    // NOTE: Enemy block is NO LONGER cleared here. It is cleared at the start of the ENEMY turn.
-
+    
+    // Process Poison Damage before draw
     setPlayer(prev => {
-        const { deck, discard, hand } = drawCards(prev.drawPile, prev.discardPile, HAND_SIZE);
+        let currentHp = prev.currentHp;
+        let poison = prev.poison;
+
+        if (poison > 0) {
+            addLog(`Poison deals ${poison} damage!`);
+            currentHp -= poison;
+            triggerVfx(`${poison} Poison`, "damage", "player");
+            triggerPlayerShake();
+            poison = Math.max(0, poison - 1); // Decrease poison level
+        }
+
+        const { deck, discard, hand } = drawCards(prev.drawPile, prev.discardPile, HAND_SIZE, () => addLog("Deck shuffled."));
+        
         return {
             ...prev,
+            currentHp,
+            poison,
             energy: prev.maxEnergy,
             block: 0,
             drawPile: deck,
@@ -186,26 +164,6 @@ export const Combat: React.FC<CombatProps> = ({
         };
     });
     setTurnPhase('PLAYER');
-  };
-
-  const isTargetedEffect = (effectId: string) => {
-      return [
-          'deal_damage', 
-          'deal_damage_heavy', 
-          'damage_x', 
-          'reckless_attack', 
-          'lifesteal', 
-          'multi_hit', 
-          'multi_hit_2',
-          'damage_prime',
-          'block_slam',
-          'damage_equal_to_block',
-          'block_damage',
-          'damage_discard',
-          'damage_x_draw',
-          'block_enemy', // Needs target to see HP
-          'damage_exhaust' // Mistake Detector needs target
-      ].includes(effectId);
   };
 
   const handleHandCardClick = (targetCard: CardType) => {
@@ -218,7 +176,7 @@ export const Combat: React.FC<CombatProps> = ({
           const drawCount = handSelectionEffect === 'exhaust_draw_2' ? 2 : 1;
           setPlayer(p => {
               const remainingHand = p.hand.filter(c => c.id !== targetCard.id);
-              const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, drawCount);
+              const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, drawCount, () => addLog("Deck shuffled."));
               triggerVfx("Exhausted!", "info", "player");
               triggerVfx(`Draw ${drawCount}`, "info", "player");
               return {
@@ -255,17 +213,19 @@ export const Combat: React.FC<CombatProps> = ({
           triggerVfx("No Energy!", "info", "player");
           return;
       }
-      const needsTarget = isTargetedEffect(card.effectId);
+      const targetType = getEffectTargetType(card.effectId);
       const livingEnemies = enemies.filter(e => e.currentHp > 0);
-      if (needsTarget && livingEnemies.length > 1) {
+      
+      if (targetType === 'enemy' && livingEnemies.length > 1) {
           setPendingCard(card);
           setTurnPhase('TARGETING');
           addLog("Select a target...");
       } else {
           setPendingCard(card);
-          if (needsTarget && livingEnemies.length === 1) setTargetId(livingEnemies[0].id);
+          if (targetType === 'enemy' && livingEnemies.length === 1) setTargetId(livingEnemies[0].id);
           else setTargetId(null);
-          setActiveProblem(generateProblem(card.mathType));
+          // Pass current tier to math generator
+          setActiveProblem(generateProblem(card.mathType, tier));
           setTurnPhase('MATH_CHALLENGE');
       }
   };
@@ -274,7 +234,7 @@ export const Combat: React.FC<CombatProps> = ({
       if (showTutorial) return;
       if (turnPhase === 'TARGETING' && enemy.currentHp > 0) {
           setTargetId(enemy.id);
-          setActiveProblem(generateProblem(pendingCard?.mathType));
+          setActiveProblem(generateProblem(pendingCard?.mathType, tier));
           setTurnPhase('MATH_CHALLENGE');
       }
   };
@@ -339,6 +299,7 @@ export const Combat: React.FC<CombatProps> = ({
     let block = card.value;
     const getTarget = () => enemies.find(e => e.id === targetId);
     switch (card.effectId) {
+        // ... (Effect resolution logic remains largely same, just abbreviated for xml context limits if necessary, but full logic below) ...
         case 'chaos_hand':
              setPlayer(p => {
                  const newHand = [...p.hand].sort(() => Math.random() - 0.5);
@@ -362,7 +323,7 @@ export const Combat: React.FC<CombatProps> = ({
             setPlayer(p => {
                 const amt = Math.max(0, p.hand.length - 1) + turnDamageBonus;
                 if (targetId) dealDamage(amt, targetId, true);
-                const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, 1);
+                const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, 1, () => addLog("Deck shuffled."));
                 triggerVfx("Draw 1", "info", "player");
                 return { ...p, drawPile: deck, discardPile: discard, hand: [...p.hand, ...hand] };
             });
@@ -391,7 +352,7 @@ export const Combat: React.FC<CombatProps> = ({
              return; 
         case 'draw_cards':
             setPlayer(p => {
-                const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, card.value);
+                const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, card.value, () => addLog("Deck shuffled."));
                 triggerVfx("Draw Cards", "info", "player");
                 return { ...p, drawPile: deck, discardPile: discard, hand: [...p.hand, ...hand] };
             });
@@ -451,7 +412,7 @@ export const Combat: React.FC<CombatProps> = ({
              break;
         case 'block_draw':
              setPlayer(p => {
-                const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, 1);
+                const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, 1, () => addLog("Deck shuffled."));
                 triggerVfx("Draw 1", "info", "player");
                 triggerVfx(`+${block}`, "block", "player");
                 return { ...p, block: p.block + block, drawPile: deck, discardPile: discard, hand: [...p.hand, ...hand] };
@@ -488,7 +449,7 @@ export const Combat: React.FC<CombatProps> = ({
              });
              return;
     }
-    if (isTargetedEffect(card.effectId) && targetId) dealDamage(damage, targetId, true); 
+    if (getEffectTargetType(card.effectId) === 'enemy' && targetId) dealDamage(damage, targetId, true); 
     else if (card.type === 'skill' && (card.effectId === 'gain_block' || card.effectId === 'gain_block_heavy')) {
         setPlayer(p => ({ ...p, block: p.block + block }));
         triggerVfx(<ShieldIcon size={40} className="text-blue-400 fill-blue-900/50" />, "block", "player");
@@ -566,7 +527,7 @@ export const Combat: React.FC<CombatProps> = ({
     setTurnPhase('ENEMY_ANIMATING');
     addLog("--- Enemy Turn ---");
     
-    // NEW: Clear enemy block at the START of the enemy phase
+    // Clear enemy block at the START of the enemy phase
     setEnemies(prev => prev.map(e => ({ ...e, block: 0 })));
 
     const livingEnemies = enemies.filter(e => e.currentHp > 0);
@@ -582,6 +543,7 @@ export const Combat: React.FC<CombatProps> = ({
       return new Promise(resolve => {
         setTimeout(() => {
             const intent = enemy.intent;
+            
             if (intent.type === 'attack') {
                 if (enemy.id.includes('boss')) {
                     showEnemyTaunt(enemy.id, BOSS_ATTACK_TAUNTS[Math.floor(Math.random() * BOSS_ATTACK_TAUNTS.length)]);
@@ -592,6 +554,85 @@ export const Combat: React.FC<CombatProps> = ({
                     setEnemyAnimStates(prev => ({ ...prev, [enemy.id]: 'idle' }));
                     resolve();
                 }, 500);
+
+            } else if (intent.type === 'drain') {
+                // New Vampirism/Drain Logic for Boss 2
+                if (enemy.id.includes('boss')) {
+                    showEnemyTaunt(enemy.id, "I hunger for your integers!");
+                }
+                setEnemyAnimStates(prev => ({ ...prev, [enemy.id]: 'attack' }));
+                
+                setTimeout(() => {
+                    setPlayer(prev => {
+                        const blocked = Math.min(prev.block, intent.value);
+                        const unblocked = intent.value - blocked;
+                        
+                        // Handle Block VFX
+                        if (blocked > 0) {
+                            triggerVfx(`Blocked ${blocked}`, "block", "player");
+                            setPlayerBlockAnim(true);
+                            setTimeout(() => setPlayerBlockAnim(false), 600);
+                        }
+
+                        // Damage Logic
+                        if (unblocked > 0) {
+                            triggerVfx(unblocked.toString(), "damage", "player");
+                            triggerPlayerShake();
+                            
+                            // HEAL THE ENEMY
+                            setEnemies(currEnemies => currEnemies.map(e => {
+                                if (e.id === enemy.id) {
+                                    const healAmt = unblocked;
+                                    triggerVfx(`+${healAmt}`, "info", e.id);
+                                    addLog(`${e.name} drains ${healAmt} HP!`);
+                                    return { ...e, currentHp: Math.min(e.maxHp, e.currentHp + healAmt) };
+                                }
+                                return e;
+                            }));
+                        } else {
+                            triggerVfx("Blocked!", "block", "player");
+                        }
+                        return { ...prev, block: prev.block - blocked, currentHp: prev.currentHp - unblocked };
+                    });
+
+                    setEnemyAnimStates(prev => ({ ...prev, [enemy.id]: 'idle' }));
+                    resolve();
+                }, 500);
+
+            } else if (intent.type === 'poison') {
+                // Poison Attack Logic
+                setEnemyAnimStates(prev => ({ ...prev, [enemy.id]: 'attack' }));
+                setTimeout(() => {
+                    // Custom damage deal to check if unblocked
+                    setPlayer(prev => {
+                         const blocked = Math.min(prev.block, intent.value);
+                         const unblocked = intent.value - blocked;
+                         
+                         if (blocked > 0) {
+                            triggerVfx(`Blocked ${blocked}`, "block", "player");
+                            setPlayerBlockAnim(true);
+                            setTimeout(() => setPlayerBlockAnim(false), 600);
+                         }
+
+                         if (unblocked > 0) {
+                             triggerVfx(unblocked.toString(), "damage", "player");
+                             triggerPlayerShake();
+                             
+                             // APPLY POISON if damage went through
+                             addLog("Poisoned!");
+                             triggerVfx("POISON!", "info", "player");
+                             return { ...prev, block: prev.block - blocked, currentHp: prev.currentHp - unblocked, poison: 3 }; 
+                         } else {
+                             triggerVfx("Blocked!", "block", "player");
+                             addLog("Poison blocked!");
+                         }
+                         return { ...prev, block: prev.block - blocked, currentHp: prev.currentHp - unblocked };
+                    });
+
+                    setEnemyAnimStates(prev => ({ ...prev, [enemy.id]: 'idle' }));
+                    resolve();
+                }, 500);
+
             } else if (intent.type === 'defend') { 
                 addLog(`${enemy.name} gains ${intent.value} block.`); 
                 triggerVfx(`+${intent.value} Block`, "block", enemy.id);
@@ -605,16 +646,33 @@ export const Combat: React.FC<CombatProps> = ({
   };
 
   const getRandomIntent = (enemy?: Enemy) => {
-      if (enemy && enemy.id.includes('boss')) {
+      // Tier 1 Boss Logic (Poly-Gone)
+      if (enemy && enemy.id.includes('boss-geometry')) {
           const r = Math.random();
-          // Boss now only Attacks or Defends
-          if (r > 0.5) return { type: 'attack' as const, value: 5 };
-          return { type: 'defend' as const, value: 5 };
+          if (r > 0.5) return { type: 'attack' as const, value: 5 + tier }; 
+          return { type: 'defend' as const, value: 5 + tier };
       }
+
+      // Tier 2 Boss Logic (Prime Predator) - Vampirism/Drain
+      if (enemy && enemy.id.includes('boss-predator')) {
+          const r = Math.random();
+          if (r < 0.4) return { type: 'drain' as const, value: 5 + tier }; // 40% chance to Life Drain
+          if (r < 0.7) return { type: 'attack' as const, value: 7 + tier }; // 30% Heavy Attack
+          return { type: 'defend' as const, value: 8 }; // 30% Heavy Defend
+      }
+      
+      // Poison Enemy Logic
+      if (enemy && enemy.id.includes('venomous')) {
+          const r = Math.random();
+          if (r < 0.4) return { type: 'poison' as const, value: 2 }; // 40% chance to poison
+          if (r < 0.7) return { type: 'attack' as const, value: 4 + tier };
+          return { type: 'defend' as const, value: 4 };
+      }
+
+      // Default Logic
       const r = Math.random();
-      // Regular enemies also simplified to remove Buffs
-      if (r > 0.5) return { type: 'attack' as const, value: Math.floor(Math.random() * 2) + 1 };
-      return { type: 'defend' as const, value: 3 };
+      if (r > 0.5) return { type: 'attack' as const, value: Math.floor(Math.random() * 2) + 1 + tier };
+      return { type: 'defend' as const, value: 3 + Math.floor(tier/2) };
   };
 
   return (
@@ -622,7 +680,7 @@ export const Combat: React.FC<CombatProps> = ({
       {/* Background Layer */}
       <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-black"></div>
 
-      {showTutorial && <TutorialModal onClose={onTutorialComplete} />}
+      {showTutorial && <TutorialModal key={tutorialType} onClose={onTutorialComplete} type={tutorialType} />}
 
       {turnPhase === 'MATH_CHALLENGE' && activeProblem && pendingCard && (
           <MathModal 
@@ -705,9 +763,11 @@ export const Combat: React.FC<CombatProps> = ({
         <div className="h-[30%] min-h-[200px] max-h-[280px] flex flex-col justify-end relative z-20">
             <div className="absolute left-2 md:left-10 top-0 z-20 flex flex-col items-center gap-2">
                 <div className="relative group">
-                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center border-4 border-amber-200">
-                        <Zap className="fill-white text-white w-6 h-6 md:w-8 md:h-8" />
-                        <span className="text-xl md:text-3xl font-bold text-white drop-shadow-md ml-1">{player.energy}/{player.maxEnergy}</span>
+                    <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center border-4 border-amber-200 relative overflow-hidden transition-transform group-hover:scale-105">
+                        <Zap className="absolute w-[120%] h-[120%] text-yellow-900/20 fill-yellow-900/20 rotate-12 -z-0" />
+                        <span className="text-lg md:text-3xl font-black text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)] z-10 relative leading-none mt-1">
+                            {player.energy}/{player.maxEnergy}
+                        </span>
                     </div>
                 </div>
                 <div className="bg-black/60 px-2 py-1 rounded-full border border-yellow-500/30 text-yellow-400 flex items-center gap-1 text-xs md:text-sm font-bold">

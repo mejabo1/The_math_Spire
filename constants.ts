@@ -1,4 +1,6 @@
 
+
+
 import { Card, Enemy, MapNode } from './types';
 
 export const INITIAL_PLAYER_HP = 20;
@@ -254,7 +256,7 @@ export const REWARD_POOL_IDS = [
 
 export const STARTING_DECK_IDS = [
   'strike', 'strike', 'strike', 
-  'defend', 'defend', 'defend', // Added a 3rd defend card
+  'defend', 'defend', 'defend', 
   'subtraction',
   'multiply_slam',
   'divided_cleave'
@@ -271,7 +273,12 @@ const SVG_ALGEBRA_IMP = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmln
 
 const SVG_FRACTION_PHANTOM = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40" fill="%233b82f6" opacity="0.8"/><line x1="20" y1="50" x2="80" y2="50" stroke="white" stroke-width="4"/><circle cx="35" cy="35" r="4" fill="white"/><circle cx="65" cy="35" r="4" fill="white"/><path d="M40 70 Q50 60 60 70" stroke="white" stroke-width="2" fill="none"/></svg>`;
 
+const SVG_VENOMOUS_VARIABLE = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M30 20 Q50 5 70 20 Q85 40 70 70 Q50 95 30 70 Q15 40 30 20 Z" fill="%2310b981" stroke="%23064e3b" stroke-width="3"/><path d="M40 35 L45 45 L50 35 L55 45 L60 35" stroke="%23064e3b" stroke-width="2" fill="none"/><circle cx="35" cy="50" r="3" fill="%23064e3b"/><circle cx="65" cy="50" r="3" fill="%23064e3b"/><path d="M40 70 Q50 65 60 70" stroke="%23064e3b" stroke-width="2" fill="none"/><path d="M20 50 Q10 40 20 30" stroke="%2310b981" stroke-width="4" fill="none" opacity="0.6"/><path d="M80 50 Q90 60 80 70" stroke="%2310b981" stroke-width="4" fill="none" opacity="0.6"/></svg>`;
+
 const SVG_BOSS_POLYGONE = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><polygon points="50 5, 95 27, 95 72, 50 95, 5 72, 5 27" fill="%231e293b" stroke="%23fbbf24" stroke-width="4"/><circle cx="35" cy="40" r="6" fill="%23ef4444" className="animate-pulse"/><circle cx="65" cy="40" r="6" fill="%23ef4444" className="animate-pulse"/><path d="M30 70 Q50 85 70 70" stroke="%23fbbf24" stroke-width="3" fill="none"/></svg>`;
+
+// Tier 2 Boss: The Prime Predator (Wolf/Beast theme with numbers)
+const SVG_BOSS_PREDATOR = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%237f1d1d"/><stop offset="100%" stop-color="%23000"/></linearGradient></defs><path d="M20 30 Q10 10 30 15 Q40 5 50 20 Q60 5 70 15 Q90 10 80 30 Q95 50 80 70 Q90 90 50 95 Q10 90 20 70 Q5 50 20 30 Z" fill="url(%23g)" stroke="%23dc2626" stroke-width="3"/><path d="M30 40 L40 45 L35 55 Z" fill="%23ef4444"/><path d="M70 40 L60 45 L65 55 Z" fill="%23ef4444"/><path d="M40 70 L50 80 L60 70" stroke="%23ef4444" stroke-width="2" fill="none"/><path d="M25 60 L35 75 L45 60" fill="white"/><path d="M75 60 L65 75 L55 60" fill="white"/><circle cx="35" cy="45" r="2" fill="white"/><circle cx="65" cy="45" r="2" fill="white"/></svg>`;
 
 
 // --- ENEMIES ---
@@ -289,8 +296,8 @@ export const ENEMIES: Enemy[] = [
   {
     id: 'algebra_imp',
     name: 'Algebra Imp',
-    maxHp: 5,
-    currentHp: 5,
+    maxHp: 15, // Buffed slightly for balancing
+    currentHp: 15,
     block: 0,
     intent: { type: 'defend', value: 6 },
     image: SVG_ALGEBRA_IMP
@@ -307,43 +314,96 @@ export const ENEMIES: Enemy[] = [
   {
     id: 'boss_geometry',
     name: 'The Poly-Gone',
-    maxHp: 30,
-    currentHp: 30,
+    maxHp: 40,
+    currentHp: 40,
     block: 0,
     intent: { type: 'attack', value: 5 },
     image: SVG_BOSS_POLYGONE
+  },
+  // TIER 2 ENEMY
+  {
+    id: 'venomous_variable',
+    name: 'Venomous Variable',
+    maxHp: 15, // NERFED from 25
+    currentHp: 15, // NERFED from 25
+    block: 0,
+    intent: { type: 'poison', value: 2 },
+    image: SVG_VENOMOUS_VARIABLE
+  },
+  // TIER 2 BOSS
+  {
+    id: 'boss_predator',
+    name: 'The Prime Predator',
+    maxHp: 65,
+    currentHp: 65,
+    block: 0,
+    intent: { type: 'drain', value: 6 }, // Unique mechanic: Life Steal
+    image: SVG_BOSS_PREDATOR
   }
 ];
 
 // --- MAP GENERATION HELPERS ---
 
-export const GENERATE_MAP = (): MapNode[] => {
-    // 5-Tier Map
-    const nodes: MapNode[] = [];
+export const GENERATE_MAP = (tier: number = 1): MapNode[] => {
+    // Explicitly handle Tier 2
+    if (Number(tier) === 2) {
+        const t2Nodes: MapNode[] = [];
+        // Floor 1: Wider Start (Shifted UP from y=82 to y=75)
+        t2Nodes.push({ id: '1-1', type: 'combat', x: 20, y: 75, next: ['2-1', '2-2'], completed: false });
+        t2Nodes.push({ id: '1-2', type: 'combat', x: 40, y: 75, next: ['2-2', '2-3'], completed: false });
+        t2Nodes.push({ id: '1-3', type: 'combat', x: 60, y: 75, next: ['2-3', '2-4'], completed: false });
+        t2Nodes.push({ id: '1-4', type: 'combat', x: 80, y: 75, next: ['2-4', '2-5'], completed: false });
+
+        // Floor 2: Chaos Layer (Shifted UP from y=66 to y=60)
+        t2Nodes.push({ id: '2-1', type: 'combat', x: 15, y: 60, next: ['3-1'], completed: false });
+        t2Nodes.push({ id: '2-2', type: 'event', x: 35, y: 60, next: ['3-1', '3-2'], completed: false });
+        t2Nodes.push({ id: '2-3', type: 'combat', x: 55, y: 60, next: ['3-2', '3-3'], completed: false });
+        t2Nodes.push({ id: '2-4', type: 'event', x: 75, y: 60, next: ['3-3', '3-4'], completed: false });
+        t2Nodes.push({ id: '2-5', type: 'combat', x: 90, y: 60, next: ['3-4'], completed: false });
+
+        // Floor 3: Elite Gauntlet (Shifted UP from y=50 to y=45)
+        t2Nodes.push({ id: '3-1', type: 'elite', x: 25, y: 45, next: ['4-1', '4-2'], completed: false });
+        t2Nodes.push({ id: '3-2', type: 'rest', x: 45, y: 45, next: ['4-2'], completed: false });
+        t2Nodes.push({ id: '3-3', type: 'elite', x: 65, y: 45, next: ['4-3'], completed: false });
+        t2Nodes.push({ id: '3-4', type: 'rest', x: 85, y: 45, next: ['4-3'], completed: false });
+
+        // Floor 4: Pre-Boss (Shifted UP from y=34 to y=30)
+        t2Nodes.push({ id: '4-1', type: 'event', x: 30, y: 30, next: ['5-1'], completed: false });
+        t2Nodes.push({ id: '4-2', type: 'combat', x: 50, y: 30, next: ['5-1'], completed: false });
+        t2Nodes.push({ id: '4-3', type: 'rest', x: 70, y: 30, next: ['5-1'], completed: false });
+
+        // Floor 5: Boss 2
+        t2Nodes.push({ id: '5-1', type: 'boss', x: 50, y: 15, next: [], completed: false });
+        
+        return t2Nodes;
+    }
+
+    // Default Tier 1 Map (Fallback)
+    const t1Nodes: MapNode[] = [];
     
-    // Floor 1: The Entrance (Combat) - y: 90
-    nodes.push({ id: '1-1', type: 'combat', x: 25, y: 90, next: ['2-1', '2-2'], completed: false });
-    nodes.push({ id: '1-2', type: 'combat', x: 50, y: 90, next: ['2-2', '2-3'], completed: false });
-    nodes.push({ id: '1-3', type: 'combat', x: 75, y: 90, next: ['2-3', '2-4'], completed: false });
+    // Floor 1: The Entrance (Combat)
+    t1Nodes.push({ id: '1-1', type: 'combat', x: 25, y: 80, next: ['2-1', '2-2'], completed: false });
+    t1Nodes.push({ id: '1-2', type: 'combat', x: 50, y: 80, next: ['2-2', '2-3'], completed: false });
+    t1Nodes.push({ id: '1-3', type: 'combat', x: 75, y: 80, next: ['2-3', '2-4'], completed: false });
 
-    // Floor 2: The Fork (Combat/Event) - y: 72
-    nodes.push({ id: '2-1', type: 'combat', x: 20, y: 72, next: ['3-1', '3-2'], completed: false });
-    nodes.push({ id: '2-2', type: 'event', x: 40, y: 72, next: ['3-2'], completed: false });
-    nodes.push({ id: '2-3', type: 'combat', x: 60, y: 72, next: ['3-2', '3-3'], completed: false });
-    nodes.push({ id: '2-4', type: 'event', x: 80, y: 72, next: ['3-3'], completed: false });
+    // Floor 2: The Fork (Combat/Event)
+    t1Nodes.push({ id: '2-1', type: 'combat', x: 20, y: 65, next: ['3-1', '3-2'], completed: false });
+    t1Nodes.push({ id: '2-2', type: 'event', x: 40, y: 65, next: ['3-2'], completed: false });
+    t1Nodes.push({ id: '2-3', type: 'combat', x: 60, y: 65, next: ['3-2', '3-3'], completed: false });
+    t1Nodes.push({ id: '2-4', type: 'event', x: 80, y: 65, next: ['3-3'], completed: false });
 
-    // Floor 3: The Midpoint (Elite/Rest) - y: 54
-    nodes.push({ id: '3-1', type: 'elite', x: 30, y: 54, next: ['4-1', '4-2'], completed: false });
-    nodes.push({ id: '3-2', type: 'rest', x: 50, y: 54, next: ['4-2'], completed: false });
-    nodes.push({ id: '3-3', type: 'elite', x: 70, y: 54, next: ['4-2', '4-3'], completed: false });
+    // Floor 3: The Midpoint (Elite/Rest)
+    t1Nodes.push({ id: '3-1', type: 'elite', x: 30, y: 50, next: ['4-1', '4-2'], completed: false });
+    t1Nodes.push({ id: '3-2', type: 'rest', x: 50, y: 50, next: ['4-2'], completed: false });
+    t1Nodes.push({ id: '3-3', type: 'elite', x: 70, y: 50, next: ['4-2', '4-3'], completed: false });
 
-    // Floor 4: The Ascent (Prep) - y: 36
-    nodes.push({ id: '4-1', type: 'event', x: 30, y: 36, next: ['5-1'], completed: false });
-    nodes.push({ id: '4-2', type: 'combat', x: 50, y: 36, next: ['5-1'], completed: false });
-    nodes.push({ id: '4-3', type: 'rest', x: 70, y: 36, next: ['5-1'], completed: false });
+    // Floor 4: The Ascent (Prep)
+    t1Nodes.push({ id: '4-1', type: 'event', x: 30, y: 35, next: ['5-1'], completed: false });
+    t1Nodes.push({ id: '4-2', type: 'combat', x: 50, y: 35, next: ['5-1'], completed: false });
+    t1Nodes.push({ id: '4-3', type: 'rest', x: 70, y: 35, next: ['5-1'], completed: false });
 
-    // Floor 5: The Boss - y: 15
-    nodes.push({ id: '5-1', type: 'boss', x: 50, y: 15, next: [], completed: false });
+    // Floor 5: The Boss
+    t1Nodes.push({ id: '5-1', type: 'boss', x: 50, y: 15, next: [], completed: false });
 
-    return nodes;
+    return t1Nodes;
 };

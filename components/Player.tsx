@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Player } from '../types';
-import { Shield, Heart } from 'lucide-react';
+import { Shield, Heart, FlaskConical } from 'lucide-react';
 
 interface PlayerProps {
   player: Player;
@@ -24,6 +24,14 @@ export const PlayerComponent: React.FC<PlayerProps> = ({ player, isBlocking = fa
           <div className="absolute -top-8 md:-top-12 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-2 py-0.5 md:px-3 md:py-1 rounded-full shadow-lg border-2 border-blue-400 flex items-center gap-1 font-bold z-10 animate-bounce-slow text-xs md:text-base">
             <Shield size={14} className="fill-white md:w-4 md:h-4" />
             <span>{player.block}</span>
+          </div>
+       )}
+
+       {/* Poison Icon */}
+       {player.poison > 0 && (
+          <div className="absolute -top-8 md:-top-12 right-0 bg-green-900 text-green-300 px-2 py-0.5 md:px-3 md:py-1 rounded-full shadow-lg border-2 border-green-500 flex items-center gap-1 font-bold z-10 animate-pulse text-xs md:text-base">
+            <FlaskConical size={14} className="md:w-4 md:h-4" />
+            <span>{player.poison}</span>
           </div>
        )}
 

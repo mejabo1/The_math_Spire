@@ -6,7 +6,8 @@ import { GameMap } from './components/GameMap';
 import { Combat } from './components/Combat';
 import { EventRoom } from './components/EventRoom';
 import { CardReward } from './components/CardReward';
-import { Play, RotateCw, Wrench, Lock, X, Bug, Trophy, Unlock, Skull } from 'lucide-react';
+import { TierTransition } from './components/TierTransition';
+import { Play, RotateCw, Wrench, Lock, X, Bug, Trophy, Unlock, Skull, FastForward } from 'lucide-react';
 
 const createInitialDeck = (): Card[] => {
     return STARTING_DECK_IDS.map(id => ({
@@ -24,18 +25,21 @@ const INITIAL_STATE: GameState = {
         energy: INITIAL_MAX_ENERGY,
         maxEnergy: INITIAL_MAX_ENERGY,
         block: 0,
-        gold: 10, // Updated starting gold to 10
+        gold: 10,
         deck: [],
         discardPile: [],
         drawPile: [],
         hand: [],
-        relics: []
+        relics: [],
+        poison: 0 // Initialize poison
     },
     currentEnemies: [],
     floor: 1,
+    tier: 1, // Initialize Tier
     map: [],
     currentMapNodeId: null,
     tutorialSeen: false,
+    poisonTutorialSeen: false,
 };
 
 const App: React.FC = () => {
@@ -56,7 +60,7 @@ const App: React.FC = () => {
     const [pendingRewards, setPendingRewards] = useState(0);
     const [rewardTutorialSeen, setRewardTutorialSeen] = useState(false);
 
-    // FIX: Handle device resize quirks (Chromebooks/Mobile/Iframes)
+    // FIX: Handle device resize quirks
     useEffect(() => {
         const handleResize = () => {
             setWindowSize({ w: window.innerWidth, h: window.innerHeight });
@@ -78,14 +82,39 @@ const App: React.FC = () => {
         setGameState({
             ...INITIAL_STATE,
             screen: 'MAP',
-            map: GENERATE_MAP(),
+            map: GENERATE_MAP(1),
             player: {
                 ...INITIAL_STATE.player,
                 deck: deck,
                 drawPile: [...deck]
             }
         });
-        setRewardTutorialSeen(false); // Reset for new game if needed, or keep persistent
+        setRewardTutorialSeen(false);
+    };
+
+    const startTierTwoGame = () => {
+        const deck = createInitialDeck();
+        const tier = 2;
+        const map = GENERATE_MAP(tier);
+        
+        setGameState({
+            ...INITIAL_STATE,
+            screen: 'MAP',
+            tier: tier,
+            map: map,
+            player: {
+                ...INITIAL_STATE.player,
+                deck: deck,
+                drawPile: [...deck],
+                maxHp: INITIAL_PLAYER_HP + 10, // Buff for starting late
+                currentHp: INITIAL_PLAYER_HP + 10,
+                gold: 50 // Buff for starting late
+            },
+            tutorialSeen: true, // Skip Intro Tutorial
+            poisonTutorialSeen: false
+        });
+        setRewardTutorialSeen(false);
+        setIsDevOpen(false);
     };
 
     const startDevBattle = (enemyTemplate: Enemy, oneHp: boolean) => {
@@ -101,7 +130,6 @@ const App: React.FC = () => {
             ...INITIAL_STATE,
             screen: 'COMBAT',
             currentEnemies: [enemy],
-            // Use a dummy map so getCurrentNodeType works without crashing
             map: [], 
             player: {
                 ...INITIAL_STATE.player,
@@ -134,18 +162,25 @@ const App: React.FC = () => {
             nextScreen = 'COMBAT';
             isCombatNode = true;
             
-            // Scale difficulty based on floor
-            // Floor 1: 1 enemy
-            // Floor 2: 1-2 enemies
-            // Floor 4: 2-3 enemies
+            // Tier 1 scaling: Floor 2 (1-2), Floor 3+ (2-3)
+            // Tier 2 scaling: Harder.
             let min = 1, max = 1;
-            if (floor === 2) { max = 2; }
-            if (floor >= 3) { min = 2; max = 3; }
+            
+            if (gameState.tier === 1) {
+                if (floor === 2) { max = 2; }
+                if (floor >= 3) { min = 2; max = 3; }
+            } else {
+                // Tier 2 is harder
+                min = 2; max = 3;
+            }
 
             const count = Math.floor(Math.random() * (max - min + 1)) + min;
             
-            // Standard combat pool (Triangle, Imp). Fraction Phantom removed from here.
-            const pool = [ENEMIES[0], ENEMIES[1]]; 
+            // Enemy Pool: Include Poison enemies in Tier 2
+            let pool = [ENEMIES[0], ENEMIES[1]]; 
+            if (gameState.tier === 2) {
+                pool.push(ENEMIES[4]); // Venomous Variable
+            }
             
             for(let i=0; i<count; i++) {
                 const template = pool[Math.floor(Math.random() * pool.length)];
@@ -160,11 +195,12 @@ const App: React.FC = () => {
         } else if (node.type === 'elite') {
             nextScreen = 'COMBAT';
             isCombatNode = true;
-             // Elite encounter: Single Fraction Phantom
-             const template = ENEMIES[2]; // Fraction Phantom
+             // Elite encounter
+             // Tier 1: Fraction Phantom
+             // Tier 2: Venomous Variable (Buffed)
+             const template = gameState.tier === 2 ? ENEMIES[4] : ENEMIES[2];
              
-             // Keep the elite buff (1.2x HP)
-             const maxHp = Math.floor(template.maxHp * 1.2);
+             const maxHp = Math.floor(template.maxHp * 1.5);
              
              enemies.push({
                 ...template,
@@ -176,10 +212,13 @@ const App: React.FC = () => {
         } else if (node.type === 'boss') {
             nextScreen = 'COMBAT';
             isCombatNode = true;
-            const template = ENEMIES[3];
+            
+            // SPAWN CORRECT BOSS BASED ON TIER
+            const template = gameState.tier === 2 ? ENEMIES[5] : ENEMIES[3]; // 5 is Predator, 3 is Poly-Gone
+            
             enemies.push({
                 ...template,
-                id: 'boss-1',
+                id: `boss-${gameState.tier}`,
                 currentHp: devOneHpMode ? 1 : template.maxHp,
                 maxHp: devOneHpMode ? 1 : template.maxHp
             });
@@ -198,6 +237,7 @@ const App: React.FC = () => {
                 updatedPlayer.hand = [];
                 updatedPlayer.block = 0;
                 updatedPlayer.energy = updatedPlayer.maxEnergy;
+                updatedPlayer.poison = 0; // Reset poison between fights
             }
 
             return {
@@ -217,15 +257,24 @@ const App: React.FC = () => {
         const isBoss = currentNode?.type === 'boss' || gameState.currentEnemies.some(e => e.id.includes('boss'));
         
         // Reward Logic
-        setPendingRewards(isElite ? 2 : 1);
+        // Skip card reward if Tier 1 Boss (The Poly-Gone)
+        if (isBoss && gameState.tier === 1) {
+            setPendingRewards(0);
+        } else {
+            setPendingRewards(isElite ? 2 : 1);
+        }
         
         // Gold Logic
         let goldReward = 10;
         if (isElite) goldReward = 20;
         if (isBoss) goldReward = 50;
+        
+        // Difficulty Multiplier
+        goldReward = goldReward * gameState.tier;
 
         setGameState(prev => {
-            if (isBoss) {
+            if (isBoss && prev.tier === 2) {
+                 // Final Victory if beating Boss 2 (Tier 2)
                  return {
                     ...prev,
                     screen: 'VICTORY',
@@ -238,14 +287,32 @@ const App: React.FC = () => {
                 };
             }
 
+            // Skip Reward Screen for Tier 1 Boss -> Go directly to Transition
+            if (isBoss && prev.tier === 1) {
+                return {
+                    ...prev,
+                    screen: 'TIER_TRANSITION',
+                    currentEnemies: [],
+                    player: { 
+                        ...prev.player, 
+                        // FULL HEAL FOR TIER 1 BOSS VICTORY
+                        currentHp: prev.player.maxHp, 
+                        gold: prev.player.gold + goldReward,
+                        poison: 0
+                    }
+                };
+            }
+
+            // Normal Reward Screen
             return {
                 ...prev,
                 screen: 'REWARD',
                 currentEnemies: [],
                 player: { 
                     ...prev.player, 
-                    currentHp: remainingHp,
-                    gold: prev.player.gold + goldReward
+                    currentHp: Math.min(prev.player.maxHp, remainingHp + (isBoss ? 10 : 0)), // Small heal after boss
+                    gold: prev.player.gold + goldReward,
+                    poison: 0
                 }
             };
         });
@@ -256,7 +323,11 @@ const App: React.FC = () => {
     };
 
     const handleTutorialComplete = () => {
-        setGameState(prev => ({ ...prev, tutorialSeen: true }));
+        if (!gameState.tutorialSeen) {
+            setGameState(prev => ({ ...prev, tutorialSeen: true }));
+        } else if (gameState.tier === 2 && !gameState.poisonTutorialSeen) {
+            setGameState(prev => ({ ...prev, poisonTutorialSeen: true }));
+        }
     };
 
     const handleEventComplete = (reward: boolean) => {
@@ -284,10 +355,19 @@ const App: React.FC = () => {
             const newCard = { ...card, id: card.id + Math.random().toString(36).substr(2, 5) };
             const newDeck = [...prev.player.deck, newCard];
 
+            // If rewards are done, go back to Map
+            if (nextRewards <= 0) {
+                 return {
+                     ...prev,
+                     screen: 'MAP',
+                     player: { ...prev.player, deck: newDeck }
+                 };
+            }
+
+            // Stay on REWARD screen if more rewards are pending
             return {
                 ...prev,
-                // Stay on REWARD screen if more rewards are pending
-                screen: nextRewards > 0 ? 'REWARD' : 'MAP',
+                screen: 'REWARD',
                 player: {
                     ...prev.player,
                     deck: newDeck,
@@ -329,6 +409,34 @@ const App: React.FC = () => {
                 player: newPlayer
             };
         });
+    };
+    
+    const handleStartTierTwo = () => {
+        const nextTier = 2;
+        // CRITICAL: Generate the map FIRST and store it in a variable to ensure it's not empty
+        const nextMapNodes = GENERATE_MAP(nextTier);
+        
+        console.log("Starting Tier 2 with Nodes:", nextMapNodes);
+
+        setGameState(prev => ({
+            ...prev,
+            tier: nextTier,
+            screen: 'MAP',
+            map: nextMapNodes,
+            currentMapNodeId: null,
+            currentEnemies: [],
+            floor: 1,
+            poisonTutorialSeen: false, // Ensure tutorial triggers
+            player: {
+                ...prev.player, // EXPLICITLY PRESERVE PLAYER STATS AND DECK
+                drawPile: [...prev.player.deck], // Reset deck for new run leg
+                discardPile: [],
+                hand: [],
+                energy: prev.player.maxEnergy,
+                block: 0,
+                poison: 0
+            }
+        }));
     };
 
     const getCurrentNodeType = () => {
@@ -404,6 +512,13 @@ const App: React.FC = () => {
                                         <div className={`w-4 h-4 rounded-full ${devOneHpMode ? 'bg-red-500' : 'bg-slate-500'}`}></div>
                                     </div>
                                 </div>
+
+                                <button 
+                                    onClick={startTierTwoGame}
+                                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded font-bold shadow-lg transition-all flex items-center justify-center gap-2 mb-4 cursor-pointer"
+                                >
+                                    <FastForward size={20} /> Start Tier 2 Run
+                                </button>
                                 
                                 <p className="text-slate-400 text-sm">Quick Combat Test</p>
                                 
@@ -466,6 +581,7 @@ const App: React.FC = () => {
             {gameState.screen === 'MAP' && (
                 <>
                     <GameMap 
+                        key={`map-tier-${gameState.tier}`}
                         mapNodes={gameState.map} 
                         currentNodeId={gameState.currentMapNodeId}
                         onNodeSelect={handleNodeSelect}
@@ -488,8 +604,10 @@ const App: React.FC = () => {
                     enemies={gameState.currentEnemies}
                     onVictory={handleCombatVictory}
                     onDefeat={handleCombatDefeat}
-                    showTutorial={!gameState.tutorialSeen}
+                    showTutorial={!gameState.tutorialSeen || (gameState.tier === 2 && !gameState.poisonTutorialSeen)}
+                    tutorialType={!gameState.tutorialSeen ? 'intro' : 'poison'}
                     onTutorialComplete={handleTutorialComplete}
+                    tier={gameState.tier}
                 />
             )}
 
@@ -510,6 +628,10 @@ const App: React.FC = () => {
                 />
             )}
 
+            {gameState.screen === 'TIER_TRANSITION' && (
+                <TierTransition onContinue={handleStartTierTwo} />
+            )}
+
             {gameState.screen === 'GAME_OVER' && (
                 <div className="flex flex-col items-center justify-center h-full bg-red-950/90 text-center">
                     <h2 className="text-6xl font-serif text-red-500 mb-4">DEFEAT</h2>
@@ -528,8 +650,8 @@ const App: React.FC = () => {
                     <div className="bg-black/80 p-12 rounded-2xl backdrop-blur-md border-2 border-amber-500 shadow-[0_0_50px_rgba(245,158,11,0.5)] flex flex-col items-center">
                         <Trophy size={80} className="text-yellow-400 mb-6 animate-bounce-slow" />
                         <h2 className="text-6xl font-serif text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-amber-500 mb-6">VICTORY!</h2>
-                        <p className="text-2xl text-slate-200 mb-2">The Poly-Gone has been vanquished.</p>
-                        <p className="text-xl text-amber-200 mb-10 font-light italic">Thanks for playing! Level 2 is coming soon!</p>
+                        <p className="text-2xl text-slate-200 mb-2">You have conquered Tier {gameState.tier}!</p>
+                        <p className="text-xl text-amber-200 mb-10 font-light italic">The Spire remains infinite...</p>
                         
                         <button 
                             onClick={() => setGameState(INITIAL_STATE)}

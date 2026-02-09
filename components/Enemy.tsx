@@ -1,7 +1,9 @@
 
+
+
 import React from 'react';
 import { Enemy } from '../types';
-import { Sword, Shield, Target } from 'lucide-react';
+import { Sword, Shield, Target, FlaskConical, Droplet } from 'lucide-react';
 
 interface EnemyProps {
   enemy: Enemy;
@@ -14,7 +16,7 @@ interface EnemyProps {
 export const EnemyComponent: React.FC<EnemyProps> = ({ enemy, animationState = 'idle', isTargetable = false, onClick, taunt }) => {
   // Calculate HP Percentage
   const hpPercent = Math.max(0, (enemy.currentHp / enemy.maxHp) * 100);
-  const isAttacking = enemy.intent.type === 'attack';
+  const isAttacking = enemy.intent.type === 'attack' || enemy.intent.type === 'poison' || enemy.intent.type === 'drain';
   const hasBlock = enemy.block > 0;
 
   let animationClass = "transition-transform duration-500 transform";
@@ -60,6 +62,8 @@ export const EnemyComponent: React.FC<EnemyProps> = ({ enemy, animationState = '
       {/* Intent Bubble */}
       <div className="absolute -top-8 md:-top-12 bg-white text-slate-900 px-2 py-0.5 md:px-3 md:py-1 rounded-full shadow-lg border-2 border-slate-300 flex items-center gap-1 md:gap-2 font-bold animate-bounce-slow z-20 scale-75 md:scale-100">
         {enemy.intent.type === 'attack' && <><Sword size={16} className="text-red-600"/> <span className="text-lg">{enemy.intent.value}</span></>}
+        {enemy.intent.type === 'poison' && <><FlaskConical size={16} className="text-green-600"/> <span className="text-lg">{enemy.intent.value}</span></>}
+        {enemy.intent.type === 'drain' && <><Droplet size={16} className="text-purple-600"/> <span className="text-lg">{enemy.intent.value}</span></>}
         {enemy.intent.type === 'defend' && <><Shield size={16} className="text-blue-600"/> <span className="text-lg">{enemy.intent.value}</span></>}
       </div>
 
