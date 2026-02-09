@@ -153,6 +153,30 @@
         50% { filter: drop-shadow(0 0 15px rgba(220, 38, 38, 0.9)); }
       }
       .animate-danger-pulse { animation: danger-pulse 2s infinite ease-in-out; }
+
+      @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      .animate-shimmer { animation: shimmer 2s infinite; }
+
+      @keyframes spin-slow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin-slow { animation: spin-slow 3s linear infinite; }
+
+      @keyframes bounce-slow {
+        0%, 100% { transform: translateY(-5%); }
+        50% { transform: translateY(5%); }
+      }
+      .animate-bounce-slow { animation: bounce-slow 2s infinite ease-in-out; }
+      
+      @keyframes pulse-slow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .7; }
+      }
+      .animate-pulse-slow { animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
     </style>
   <script type="importmap">
 {

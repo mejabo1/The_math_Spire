@@ -1,6 +1,4 @@
 
-
-
 export type CardType = 'attack' | 'skill' | 'power';
 
 export type MathTopic = 'arithmetic' | 'algebra' | 'geometry' | 'percentage' | 'addition' | 'subtraction' | 'integer' | 'multiplication' | 'division' | 'exponent' | 'factorization' | 'pemdas' | 'absolute_value' | 'prime_factors' | 'subtraction_3digit' | 'decimal_addition' | 'decimal_multiplication' | 'decimal_division' | 'fraction_simplification';
@@ -48,7 +46,7 @@ export interface Player {
   poison: number; // New mechanic: 0 = none, 3 = start of 3-2-1 countdown
 }
 
-export type GameScreen = 'MENU' | 'MAP' | 'COMBAT' | 'EVENT' | 'REWARD' | 'GAME_OVER' | 'VICTORY';
+export type GameScreen = 'MENU' | 'MAP' | 'COMBAT' | 'EVENT' | 'REWARD' | 'GAME_OVER' | 'VICTORY' | 'TIER_TRANSITION';
 
 export interface GameState {
   screen: GameScreen;
