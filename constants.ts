@@ -1,6 +1,4 @@
 
-
-
 import { Card, Enemy, MapNode } from './types';
 
 export const INITIAL_PLAYER_HP = 20;
@@ -24,8 +22,8 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     name: 'Absolute Shield',
     type: 'skill',
     cost: 2,
-    value: 2,
-    description: 'Gain 2 Block.',
+    value: 3,
+    description: 'Gain 3 Block.',
     effectId: 'gain_block',
     rarity: 'common',
     mathType: 'addition'
@@ -43,7 +41,7 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
   multiply_slam: {
     name: 'Multiply Slam',
     type: 'attack',
-    cost: 2,
+    cost: 1,
     value: 0,
     description: 'Deal damage equal to your current Block.',
     effectId: 'damage_equal_to_block',
@@ -256,7 +254,7 @@ export const REWARD_POOL_IDS = [
 
 export const STARTING_DECK_IDS = [
   'strike', 'strike', 'strike', 
-  'defend', 'defend', 'defend', 
+  'defend', 'defend', 'defend', 'defend',
   'subtraction',
   'multiply_slam',
   'divided_cleave'
@@ -290,14 +288,14 @@ export const ENEMIES: Enemy[] = [
     maxHp: 10,
     currentHp: 10,
     block: 0,
-    intent: { type: 'attack', value: 5 },
+    intent: { type: 'attack', value: 3 },
     image: SVG_TRIANGLE
   },
   {
     id: 'algebra_imp',
     name: 'Algebra Imp',
-    maxHp: 15, // Buffed slightly for balancing
-    currentHp: 15,
+    maxHp: 5, 
+    currentHp: 5,
     block: 0,
     intent: { type: 'defend', value: 6 },
     image: SVG_ALGEBRA_IMP
