@@ -267,6 +267,14 @@ export const Combat: React.FC<CombatProps> = ({
       }
   };
 
+  const handleMathCancel = () => {
+    setPendingCard(null);
+    setTargetId(null);
+    setActiveProblem(null);
+    setTurnPhase('PLAYER');
+    addLog("Casting cancelled.");
+  };
+
   const playCard = (card: CardType, targetId: string | null) => {
     setPlayer(p => ({ ...p, energy: p.energy - card.cost }));
     if (['exhaust_1_draw_1', 'exhaust_1_draw_2', 'reduce_cost', 'damage_exhaust'].includes(card.effectId)) {
@@ -299,7 +307,12 @@ export const Combat: React.FC<CombatProps> = ({
     let block = card.value;
     const getTarget = () => enemies.find(e => e.id === targetId);
     switch (card.effectId) {
-        // ... (Effect resolution logic remains largely same, just abbreviated for xml context limits if necessary, but full logic below) ...
+        case 'heal_player':
+             setPlayer(p => {
+                triggerVfx(`+${card.value} HP`, "info", "player");
+                return { ...p, currentHp: Math.min(p.maxHp, p.currentHp + card.value) };
+             });
+             break;
         case 'chaos_hand':
              setPlayer(p => {
                  const newHand = [...p.hand].sort(() => Math.random() - 0.5);
@@ -646,8 +659,13 @@ export const Combat: React.FC<CombatProps> = ({
   };
 
   const getRandomIntent = (enemy?: Enemy) => {
+      const lastType = enemy?.intent.type;
+
       // Tier 1 Boss Logic (Poly-Gone)
       if (enemy && enemy.id.includes('boss-geometry')) {
+          if (lastType === 'defend') {
+               return { type: 'attack' as const, value: 5 + tier }; 
+          }
           const r = Math.random();
           if (r > 0.5) return { type: 'attack' as const, value: 5 + tier }; 
           return { type: 'defend' as const, value: 5 + tier };
@@ -655,6 +673,13 @@ export const Combat: React.FC<CombatProps> = ({
 
       // Tier 2 Boss Logic (Prime Predator) - Vampirism/Drain
       if (enemy && enemy.id.includes('boss-predator')) {
+          if (lastType === 'defend') {
+              // Can't defend, re-roll between drain (40%) and attack (30%). Normalized: 4/7 vs 3/7.
+              const r = Math.random();
+              if (r < 0.57) return { type: 'drain' as const, value: 5 + tier };
+              return { type: 'attack' as const, value: 7 + tier };
+          }
+
           const r = Math.random();
           if (r < 0.4) return { type: 'drain' as const, value: 5 + tier }; // 40% chance to Life Drain
           if (r < 0.7) return { type: 'attack' as const, value: 7 + tier }; // 30% Heavy Attack
@@ -663,6 +688,11 @@ export const Combat: React.FC<CombatProps> = ({
       
       // Poison Enemy Logic
       if (enemy && enemy.id.includes('venomous')) {
+          if (lastType === 'defend') {
+               const r = Math.random();
+               if (r < 0.57) return { type: 'poison' as const, value: 2 };
+               return { type: 'attack' as const, value: 4 + tier };
+          }
           const r = Math.random();
           if (r < 0.4) return { type: 'poison' as const, value: 2 }; // 40% chance to poison
           if (r < 0.7) return { type: 'attack' as const, value: 4 + tier };
@@ -670,6 +700,10 @@ export const Combat: React.FC<CombatProps> = ({
       }
 
       // Default Logic
+      if (lastType === 'defend') {
+           return { type: 'attack' as const, value: Math.floor(Math.random() * 2) + 1 + tier };
+      }
+
       const r = Math.random();
       if (r > 0.5) return { type: 'attack' as const, value: Math.floor(Math.random() * 2) + 1 + tier };
       return { type: 'defend' as const, value: 3 + Math.floor(tier/2) };
@@ -687,6 +721,7 @@ export const Combat: React.FC<CombatProps> = ({
             problem={activeProblem} 
             cardName={pendingCard.name}
             onAnswer={handleMathAnswer}
+            onClose={handleMathCancel} // Passed handler
           />
       )}
 

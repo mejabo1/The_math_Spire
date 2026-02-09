@@ -1,18 +1,29 @@
+
 import React from 'react';
 import { MathProblem } from '../utils/mathGenerator';
-import { Brain } from 'lucide-react';
+import { Brain, X } from 'lucide-react';
 
 interface MathModalProps {
   problem: MathProblem;
   cardName: string;
   onAnswer: (correct: boolean) => void;
+  onClose: () => void;
 }
 
-export const MathModal: React.FC<MathModalProps> = ({ problem, cardName, onAnswer }) => {
+export const MathModal: React.FC<MathModalProps> = ({ problem, cardName, onAnswer, onClose }) => {
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
       <div className="bg-slate-800 border-2 border-amber-500 rounded-2xl p-8 max-w-md w-full shadow-2xl relative overflow-hidden">
         
+        {/* Close Button */}
+        <button 
+            onClick={onClose}
+            className="absolute top-4 right-4 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full p-2 transition-all z-10 cursor-pointer"
+            title="Cancel Casting"
+        >
+            <X size={24} />
+        </button>
+
         {/* Header */}
         <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-900/50 mb-3 border border-amber-500/30">
@@ -34,7 +45,7 @@ export const MathModal: React.FC<MathModalProps> = ({ problem, cardName, onAnswe
                 <button
                     key={idx}
                     onClick={() => onAnswer(option === problem.correctAnswer)}
-                    className="bg-slate-700 hover:bg-slate-600 border border-slate-500 hover:border-amber-400 text-white py-4 rounded-lg text-xl font-bold transition-all active:scale-95 shadow-lg"
+                    className="bg-slate-700 hover:bg-slate-600 border border-slate-500 hover:border-amber-400 text-white py-4 rounded-lg text-xl font-bold transition-all active:scale-95 shadow-lg cursor-pointer"
                 >
                     {option}
                 </button>

@@ -229,6 +229,26 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     effectId: 'chaos_hand',
     rarity: 'epic',
     mathType: 'decimal_division'
+  },
+  decimal_salve: {
+    name: 'Decimal Salve',
+    type: 'skill',
+    cost: 2,
+    value: 3,
+    description: 'Heal 3 HP.',
+    effectId: 'heal_player',
+    rarity: 'rare',
+    mathType: 'decimal_addition'
+  },
+  integer_fortress: {
+    name: 'Wordy Shield',
+    type: 'skill',
+    cost: 3,
+    value: 7,
+    description: 'Gain 7 Block.',
+    effectId: 'gain_block',
+    rarity: 'common',
+    mathType: 'integer_word_problem'
   }
 };
 
@@ -249,7 +269,9 @@ export const REWARD_POOL_IDS = [
   'show_your_work',
   'mistake_detector',
   'simplify',
-  'loose_notes_chaos'
+  'loose_notes_chaos',
+  'decimal_salve',
+  'integer_fortress'
 ];
 
 export const STARTING_DECK_IDS = [
@@ -297,7 +319,7 @@ export const ENEMIES: Enemy[] = [
     maxHp: 5, 
     currentHp: 5,
     block: 0,
-    intent: { type: 'defend', value: 6 },
+    intent: { type: 'defend', value: 4 },
     image: SVG_ALGEBRA_IMP
   },
   {
@@ -331,7 +353,7 @@ export const ENEMIES: Enemy[] = [
   // TIER 2 BOSS
   {
     id: 'boss_predator',
-    name: 'The Prime Predator',
+    name: 'The Fraction Freak',
     maxHp: 65,
     currentHp: 65,
     block: 0,

@@ -48,6 +48,7 @@ export const generateProblem = (forcedTopic?: MathTopic, tier: number = 1): Math
     case 'decimal_multiplication': return generateDecimalMultiplication();
     case 'decimal_division': return generateDecimalDivision();
     case 'fraction_simplification': return generateFractionSimplification();
+    case 'integer_word_problem': return generateIntegerWordProblem();
     
     default: return generateArithmetic(tier);
   }
@@ -304,4 +305,25 @@ const generateFractionSimplification = (): MathProblem => {
         options.add(`${getRandomInt(1,5)}/${getRandomInt(6,9)}`);
     }
     return { question: `Simplify: ${bigNum}/${bigDen}`, options: Array.from(options).sort(() => Math.random() - 0.5), correctAnswer: ans, topic: 'Simplifying Fractions' };
+};
+
+const generateIntegerWordProblem = (): MathProblem => {
+  const scenarios = [
+    { t: "Temperature", q: (a: number, b: number) => `The temperature was ${a}°C. It dropped by ${b}°C. What is it now?`, calc: (a: number, b: number) => a - b },
+    { t: "Elevation", q: (a: number, b: number) => `A diver is at ${-a}m. They dive ${b}m deeper. What is their depth?`, calc: (a: number, b: number) => -a - b },
+    { t: "Bank Account", q: (a: number, b: number) => `You have $${a}. You spend $${b}. What is your balance?`, calc: (a: number, b: number) => a - b },
+    { t: "Elevator", q: (a: number, b: number) => `You are on floor ${a}. You go down ${b} floors. What floor are you on?`, calc: (a: number, b: number) => a - b }
+  ];
+  
+  const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+  const a = getRandomInt(5, 20);
+  const b = getRandomInt(5, 20);
+  const ans = scenario.calc(a, b);
+  
+  return { 
+    question: scenario.q(a, b), 
+    options: generateOptions(ans), 
+    correctAnswer: ans.toString(), 
+    topic: 'Integer Word Problem' 
+  };
 };
