@@ -29,11 +29,13 @@
       .items-center { align-items: center; }
       .justify-center { justify-content: center; }
       .justify-between { justify-content: space-between; }
+      .justify-end { justify-content: flex-end; }
       .relative { position: relative; }
       .absolute { position: absolute; }
       .fixed { position: fixed; }
       .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
       .z-10 { z-index: 10; }
+      .z-20 { z-index: 20; }
       .z-50 { z-index: 50; }
       
       /* Spacing & Margins */
@@ -41,6 +43,7 @@
       .my-auto { margin-top: auto; margin-bottom: auto; }
       .mb-2 { margin-bottom: 0.5rem; }
       .mb-4 { margin-bottom: 1rem; }
+      .mb-6 { margin-bottom: 1.5rem; }
       .mb-8 { margin-bottom: 2rem; }
       .gap-2 { gap: 0.5rem; }
       .gap-3 { gap: 0.75rem; }
@@ -50,6 +53,8 @@
       .p-10 { padding: 2.5rem; }
       .px-12 { padding-left: 3rem; padding-right: 3rem; }
       .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+      .bottom-6 { bottom: 1.5rem; }
+      .right-6 { right: 1.5rem; }
       
       /* Text & Fonts */
       .text-center { text-align: center; }
@@ -58,6 +63,8 @@
       .text-white { color: #fff; }
       .text-amber-100 { color: #fef3c7; }
       .text-slate-300 { color: #cbd5e1; }
+      .text-slate-400 { color: #94a3b8; }
+      .text-slate-500 { color: #64748b; }
       .text-xl { font-size: 1.25rem; }
       .text-6xl { font-size: 3.75rem; }
       
@@ -83,6 +90,18 @@
       
       /* Polyfill for Arbitrary Shadow in Menu Button */
       button[class*="shadow-["] { box-shadow: 0 0 20px rgba(185,28,28,0.5); }
+
+      /* Gradient Text Fallback */
+      .text-transparent { color: transparent; }
+      .bg-clip-text { -webkit-background-clip: text; background-clip: text; }
+      .bg-gradient-title { background-image: linear-gradient(to right, #fde68a, #eab308); }
+      
+      /* Menu Background Fallback */
+      .bg-menu-pattern {
+        background-image: url('https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=2070&auto=format&fit=crop');
+        background-size: cover;
+        background-position: center;
+      }
 
       /* Animation Fallbacks */
       @keyframes card-deal {

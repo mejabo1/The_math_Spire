@@ -44,7 +44,12 @@ const INITIAL_STATE: GameState = {
 
 const App: React.FC = () => {
     const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
-    const [windowSize, setWindowSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+    
+    // Fallback to sensible defaults (100vh) if window size reads 0 initially
+    const [windowSize, setWindowSize] = useState({ 
+        w: window.innerWidth || 800, 
+        h: window.innerHeight || 600 
+    });
     
     // Dev Mode State
     const [isDevOpen, setIsDevOpen] = useState(false);
@@ -63,13 +68,19 @@ const App: React.FC = () => {
     // FIX: Handle device resize quirks
     useEffect(() => {
         const handleResize = () => {
-            setWindowSize({ w: window.innerWidth, h: window.innerHeight });
+            // Ensure non-zero values
+            const w = window.innerWidth || document.documentElement.clientWidth || 800;
+            const h = window.innerHeight || document.documentElement.clientHeight || 600;
+            setWindowSize({ w, h });
         };
         
         window.addEventListener('resize', handleResize);
         
         // Force multiple checks to catch post-load resize (common in iframes)
         const timeouts = [100, 500, 1000, 2000].map(t => setTimeout(handleResize, t));
+
+        // Initial check
+        handleResize();
 
         return () => {
             window.removeEventListener('resize', handleResize);
@@ -555,9 +566,9 @@ const App: React.FC = () => {
             )}
 
             {gameState.screen === 'MENU' && (
-                <div className="flex flex-col items-center justify-center h-full bg-slate-900 bg-[url('https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center">
+                <div className="flex flex-col items-center justify-center h-full bg-slate-900 bg-menu-pattern bg-cover bg-center relative">
                     <div className="bg-black/60 p-10 rounded-2xl backdrop-blur-sm text-center border border-white/10 relative">
-                        <h1 className="text-6xl font-serif mb-2 text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-500 drop-shadow-lg">MATH SPIRE</h1>
+                        <h1 className="text-6xl font-serif mb-2 text-transparent bg-clip-text bg-gradient-title drop-shadow-lg">MATH SPIRE</h1>
                         <p className="text-xl text-gray-300 mb-8 font-light">Climb the tower. Solve the equations.</p>
                         <button 
                             onClick={startGame}
@@ -570,7 +581,7 @@ const App: React.FC = () => {
                     {/* Dev Mode Trigger Button */}
                     <button 
                         onClick={() => setIsDevOpen(true)}
-                        className="absolute bottom-6 right-6 p-3 bg-black/40 text-slate-500 hover:text-white hover:bg-black/60 rounded-full transition-all backdrop-blur-sm border border-transparent hover:border-slate-500 cursor-pointer"
+                        className="absolute bottom-6 right-6 p-3 bg-black/40 text-slate-500 hover:text-white hover:bg-black/60 rounded-full transition-all backdrop-blur-sm border border-transparent hover:border-slate-500 cursor-pointer z-50"
                         title="Dev Mode"
                     >
                         <Wrench size={24} />
