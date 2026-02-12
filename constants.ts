@@ -300,6 +300,8 @@ const SVG_BOSS_POLYGONE = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xm
 // Tier 2 Boss: The Prime Predator (Wolf/Beast theme with numbers)
 const SVG_BOSS_PREDATOR = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%237f1d1d"/><stop offset="100%" stop-color="%23000"/></linearGradient></defs><path d="M20 30 Q10 10 30 15 Q40 5 50 20 Q60 5 70 15 Q90 10 80 30 Q95 50 80 70 Q90 90 50 95 Q10 90 20 70 Q5 50 20 30 Z" fill="url(%23g)" stroke="%23dc2626" stroke-width="3"/><path d="M30 40 L40 45 L35 55 Z" fill="%23ef4444"/><path d="M70 40 L60 45 L65 55 Z" fill="%23ef4444"/><path d="M40 70 L50 80 L60 70" stroke="%23ef4444" stroke-width="2" fill="none"/><path d="M25 60 L35 75 L45 60" fill="white"/><path d="M75 60 L65 75 L55 60" fill="white"/><circle cx="35" cy="45" r="2" fill="white"/><circle cx="65" cy="45" r="2" fill="white"/></svg>`;
 
+// Unique Enemy: Math Mimic (Replaces Elites)
+const SVG_MATH_MIMIC = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="35" width="60" height="45" rx="5" fill="%23a855f7" stroke="%236b21a8" stroke-width="3"/><path d="M20 35 L80 35 L70 15 L30 15 Z" fill="%239333ea" stroke="%236b21a8" stroke-width="3"/><path d="M20 35 L80 35" stroke="%23000" stroke-width="2"/><path d="M35 45 L40 55 L45 45 L50 55 L55 45 L60 55 L65 45" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40" cy="25" r="3" fill="yellow" className="animate-pulse"/><circle cx="60" cy="25" r="3" fill="yellow" className="animate-pulse"/><text x="50" y="70" font-family="monospace" font-size="12" fill="white" text-anchor="middle">?</text></svg>`;
 
 // --- ENEMIES ---
 
@@ -307,37 +309,37 @@ export const ENEMIES: Enemy[] = [
   {
     id: 'basic_shape',
     name: 'Angry Triangle',
-    maxHp: 10,
-    currentHp: 10,
+    maxHp: 7,
+    currentHp: 7,
     block: 0,
-    intent: { type: 'attack', value: 3 },
+    intent: { type: 'attack', value: 2 },
     image: SVG_TRIANGLE
   },
   {
     id: 'algebra_imp',
     name: 'Algebra Imp',
-    maxHp: 5, 
-    currentHp: 5,
+    maxHp: 3, 
+    currentHp: 3,
     block: 0,
-    intent: { type: 'defend', value: 4 },
+    intent: { type: 'defend', value: 2 },
     image: SVG_ALGEBRA_IMP
   },
   {
     id: 'fraction_phantom',
     name: 'Fraction Phantom',
-    maxHp: 20,
-    currentHp: 20,
+    maxHp: 14,
+    currentHp: 14,
     block: 0,
-    intent: { type: 'attack', value: 6 },
+    intent: { type: 'attack', value: 4 },
     image: SVG_FRACTION_PHANTOM
   },
   {
     id: 'boss_geometry',
     name: 'The Poly-Gone',
-    maxHp: 40,
-    currentHp: 40,
+    maxHp: 35,
+    currentHp: 35,
     block: 0,
-    intent: { type: 'attack', value: 5 },
+    intent: { type: 'attack', value: 4 },
     image: SVG_BOSS_POLYGONE
   },
   // TIER 2 ENEMY
@@ -359,6 +361,16 @@ export const ENEMIES: Enemy[] = [
     block: 0,
     intent: { type: 'drain', value: 6 }, // Unique mechanic: Life Steal
     image: SVG_BOSS_PREDATOR
+  },
+  // UNIQUE ENEMY (Replaces Elite)
+  {
+    id: 'math_mimic',
+    name: 'Math Mimic',
+    maxHp: 12,
+    currentHp: 12,
+    block: 0,
+    intent: { type: 'attack', value: 3 },
+    image: SVG_MATH_MIMIC
   }
 ];
 

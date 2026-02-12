@@ -58,6 +58,7 @@ export interface GameState {
   currentMapNodeId: string | null;
   tutorialSeen: boolean;
   poisonTutorialSeen: boolean;
+  lastRewardGold: number; // Added field
 }
 
 export type RoomType = 'combat' | 'elite' | 'event' | 'rest' | 'boss';

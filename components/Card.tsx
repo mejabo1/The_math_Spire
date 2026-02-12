@@ -16,8 +16,11 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
   const isSkill = card.type === 'skill';
   const isUpgraded = card.upgraded;
 
-  // Responsive Dimensions: w-32 h-44 on small, w-40 h-56 on md+
-  const baseClasses = "relative w-32 h-44 md:w-40 md:h-56 rounded-xl border-2 transition-all duration-200 transform select-none cursor-pointer flex flex-col overflow-hidden shadow-lg";
+  // COMPACT SIZING for Chromebooks
+  // sm: w-24 h-36 (96px x 144px)
+  // md: w-28 h-40 (112px x 160px)
+  // xl: w-36 h-52 (144px x 208px) - Only for truly large screens
+  const baseClasses = "relative w-24 h-36 md:w-28 md:h-40 xl:w-36 xl:h-52 rounded-xl border-2 transition-all duration-200 transform select-none cursor-pointer flex flex-col overflow-hidden shadow-lg";
   
   // Base background/border logic
   let typeClasses = "";
@@ -36,7 +39,7 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
 
   // If noAnim is true, we strip the hover movement/scale classes, allowing parent to control transforms.
   const interactClasses = (playable && !disabled) 
-    ? (noAnim ? "hover:shadow-2xl z-10 hover:z-20 ring-2 ring-transparent hover:ring-white" : "hover:-translate-y-6 hover:scale-110 hover:shadow-2xl z-10 hover:z-20 ring-2 ring-transparent hover:ring-white")
+    ? (noAnim ? "hover:shadow-2xl z-10 hover:z-20 ring-2 ring-transparent hover:ring-white" : "hover:-translate-y-4 hover:scale-105 hover:shadow-2xl z-10 hover:z-20 ring-2 ring-transparent hover:ring-white")
     : "opacity-50 cursor-not-allowed grayscale";
 
   // Helper to determine icon
@@ -44,7 +47,7 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
     // Unique SVG for Multiply Slam
     if (card.name === 'Multiply Slam') {
         return (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 md:w-16 md:h-16 text-yellow-400 drop-shadow-lg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 md:w-12 md:h-12 text-yellow-400 drop-shadow-lg">
                 <path d="M18 6L6 18M6 6l12 12" strokeOpacity="0.3" strokeWidth="3" />
                 <path d="M14.5 2l-4.5 4.5l-6-1l1.5 6l4.5 4.5l9-9l-4.5-5z" fill="currentColor" fillOpacity="0.2" />
                 <path d="M6 21h12" strokeWidth="1" strokeOpacity="0.8" />
@@ -55,7 +58,7 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
     // Unique SVG for Divided Cleave
     if (card.name === 'Divided Cleave') {
         return (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 md:w-16 md:h-16 text-blue-300 drop-shadow-lg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 md:w-12 md:h-12 text-blue-300 drop-shadow-lg">
                 <circle cx="12" cy="6" r="1.5" fill="currentColor" />
                 <circle cx="12" cy="18" r="1.5" fill="currentColor" />
                 <path d="M5 12h14" strokeOpacity="0.2" strokeWidth="4" />
@@ -66,22 +69,22 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
 
     // Specific overrides based on card name or mathType
     if (card.name.includes("Minus") || card.mathType === 'subtraction') {
-        return <Minus className="w-8 h-8 md:w-12 md:h-12 opacity-80" />;
+        return <Minus className="w-6 h-6 md:w-10 md:h-10 opacity-80" />;
     }
     if (card.name.includes("Multiply") || card.mathType === 'multiplication') {
-        return <X className="w-8 h-8 md:w-12 md:h-12 opacity-80" />;
+        return <X className="w-6 h-6 md:w-10 md:h-10 opacity-80" />;
     }
     if (card.name.includes("Divided") || card.name.includes("Division") || card.mathType === 'division') {
-        return <Divide className="w-8 h-8 md:w-12 md:h-12 opacity-80" />;
+        return <Divide className="w-6 h-6 md:w-10 md:h-10 opacity-80" />;
     }
     if (card.mathType === 'geometry') {
-        return <CircleSlash className="w-8 h-8 md:w-12 md:h-12 opacity-80" />;
+        return <CircleSlash className="w-6 h-6 md:w-10 md:h-10 opacity-80" />;
     }
 
     // Default Type Icons
-    if (isAttack) return <Sword className="w-8 h-8 md:w-12 md:h-12 opacity-50" />;
-    if (isSkill) return <Shield className="w-8 h-8 md:w-12 md:h-12 opacity-50" />;
-    return <Zap className="w-8 h-8 md:w-12 md:h-12 opacity-50" />;
+    if (isAttack) return <Sword className="w-6 h-6 md:w-10 md:h-10 opacity-50" />;
+    if (isSkill) return <Shield className="w-6 h-6 md:w-10 md:h-10 opacity-50" />;
+    return <Zap className="w-6 h-6 md:w-10 md:h-10 opacity-50" />;
   };
 
   return (
@@ -90,12 +93,12 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
       onClick={() => (playable && !disabled) && onClick(card)}
     >
       {/* Energy Cost Badge */}
-      <div className="absolute top-2 left-2 w-6 h-6 md:w-8 md:h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold shadow-md z-10 border border-blue-300 text-sm md:text-lg">
+      <div className="absolute top-1 left-1 md:top-2 md:left-2 w-5 h-5 md:w-7 md:h-7 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold shadow-md z-10 border border-blue-300 text-xs md:text-base">
         {card.cost}
       </div>
 
       {/* Card Image Placeholder */}
-      <div className="h-20 md:h-24 bg-black/30 w-full flex items-center justify-center relative shrink-0">
+      <div className="h-16 md:h-20 bg-black/30 w-full flex items-center justify-center relative shrink-0">
         {renderCardIcon()}
         
         {/* Rarity Gem */}
@@ -107,16 +110,16 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
       </div>
 
       {/* Content */}
-      <div className="p-2 md:p-3 flex-1 flex flex-col items-center text-center overflow-hidden">
-        <h3 className={`card-title font-bold text-xs md:text-sm mb-1 uppercase tracking-wider leading-tight truncate w-full ${isUpgraded ? 'text-emerald-300' : ''}`}>
+      <div className="p-1 md:p-2 flex-1 flex flex-col items-center text-center overflow-hidden">
+        <h3 className={`card-title font-bold text-[10px] md:text-xs mb-0.5 uppercase tracking-wider leading-tight truncate w-full ${isUpgraded ? 'text-emerald-300' : ''}`}>
           {card.name}
         </h3>
-        <p className={`text-[10px] md:text-xs font-light leading-snug mt-0.5 line-clamp-3 ${isUpgraded ? 'text-emerald-100' : 'text-gray-200'}`}>
+        <p className={`text-[8px] md:text-[10px] font-light leading-tight mt-0.5 line-clamp-3 ${isUpgraded ? 'text-emerald-100' : 'text-gray-200'}`}>
             {card.description}
         </p>
       </div>
 
-      <div className="bg-black/20 py-1 text-[8px] md:text-[10px] text-center uppercase tracking-widest text-white/50 shrink-0">
+      <div className="bg-black/20 py-0.5 text-[7px] md:text-[9px] text-center uppercase tracking-widest text-white/50 shrink-0">
         {card.type}
       </div>
     </div>

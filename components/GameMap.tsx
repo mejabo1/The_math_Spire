@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { MapNode } from '../types';
-import { Skull, HelpCircle, MapPin, Tent, Crown } from 'lucide-react';
+import { Skull, HelpCircle, MapPin, Tent, Crown, Star } from 'lucide-react';
 
 interface MapProps {
   mapNodes: MapNode[];
@@ -14,12 +14,12 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
   
   const getIcon = (type: string) => {
     switch (type) {
-        case 'combat': return <Skull size={20} className="md:w-6 md:h-6" />;
-        case 'elite': return <Skull size={24} className="text-red-500 md:w-7 md:h-7" />;
-        case 'event': return <HelpCircle size={20} className="md:w-6 md:h-6" />;
-        case 'rest': return <Tent size={20} className="md:w-6 md:h-6" />;
-        case 'boss': return <Crown size={28} className="text-yellow-400 md:w-8 md:h-8" />;
-        default: return <MapPin size={20} className="md:w-6 md:h-6" />;
+        case 'combat': return <Skull size={18} className="md:w-6 md:h-6" />;
+        case 'elite': return <Star size={20} className="text-purple-400 md:w-7 md:h-7 fill-purple-400/20" />; 
+        case 'event': return <HelpCircle size={18} className="md:w-6 md:h-6" />;
+        case 'rest': return <Tent size={18} className="md:w-6 md:h-6" />;
+        case 'boss': return <Crown size={24} className="text-yellow-400 md:w-8 md:h-8" />;
+        default: return <MapPin size={18} className="md:w-6 md:h-6" />;
     }
   };
 
@@ -39,7 +39,7 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 relative p-4 md:p-8 overflow-hidden">
-        <h2 className="text-2xl md:text-4xl font-serif text-amber-100 mb-4 md:mb-8 tracking-widest uppercase border-b border-amber-500/30 pb-4">The Spire Map</h2>
+        <h2 className="text-xl md:text-4xl font-serif text-amber-100 mb-2 md:mb-8 tracking-widest uppercase border-b border-amber-500/30 pb-2 md:pb-4">The Spire Map</h2>
         
         {godMode && (
             <div className="absolute top-4 right-4 bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded animate-pulse font-bold text-xs md:text-base">
@@ -47,10 +47,16 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
             </div>
         )}
         
-        {/* Responsive Map Container: 85% of viewport min dimension, max 600px */}
+        {/* Responsive Map Container: Reduced from 85vmin to 75vmin to fit better vertically on wide/short screens */}
         <div 
-            className="relative w-[85vmin] h-[85vmin] max-w-[600px] max-h-[600px] bg-slate-800 rounded-full shadow-2xl border-4 border-slate-700 overflow-hidden shrink-0"
-            style={{ position: 'relative', borderRadius: '9999px', margin: 'auto' }}
+            className="relative w-[75vmin] h-[75vmin] max-w-[600px] max-h-[600px] bg-slate-800 rounded-full shadow-2xl border-4 border-slate-700 overflow-hidden shrink-0"
+            style={{ 
+                position: 'relative', 
+                borderRadius: '9999px', 
+                margin: 'auto',
+                width: '75vmin', /* Inline fallback */
+                height: '75vmin' /* Inline fallback */
+            }}
         >
              {/* Simple Background Pattern */}
              <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/graphy.png')]"></div>
@@ -84,8 +90,8 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
                 const isCurrent = node.id === currentNodeId;
                 const isCompleted = node.completed;
 
-                // Responsive node size: w-10 h-10 on small screens, w-16 h-16 on larger
-                let nodeClass = "absolute transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 md:w-16 md:h-16 rounded-full flex items-center justify-center border-2 md:border-4 transition-all duration-300 z-10 ";
+                // Responsive node size: Reduced slightly
+                let nodeClass = "absolute transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 md:w-16 md:h-16 rounded-full flex items-center justify-center border-2 md:border-4 transition-all duration-300 z-10 ";
                 
                 if (isCurrent) {
                     nodeClass += "bg-amber-500 border-white shadow-[0_0_20px_rgba(245,158,11,0.6)] scale-125 text-white";

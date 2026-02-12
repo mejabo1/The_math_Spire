@@ -40,6 +40,7 @@ const INITIAL_STATE: GameState = {
     currentMapNodeId: null,
     tutorialSeen: false,
     poisonTutorialSeen: false,
+    lastRewardGold: 0
 };
 
 const App: React.FC = () => {
@@ -206,12 +207,12 @@ const App: React.FC = () => {
         } else if (node.type === 'elite') {
             nextScreen = 'COMBAT';
             isCombatNode = true;
-             // Elite encounter
-             // Tier 1: Fraction Phantom
-             // Tier 2: Venomous Variable (Buffed)
-             const template = gameState.tier === 2 ? ENEMIES[4] : ENEMIES[2];
+             // SPECIAL ENCOUNTER: MATH MIMIC
+             // Formerly Elite, now a Unique but less punishing encounter
+             const template = ENEMIES[6]; // Math Mimic
              
-             const maxHp = Math.floor(template.maxHp * 1.5);
+             // Scale Mimic HP slightly for Tier 2
+             const maxHp = gameState.tier === 2 ? 40 : template.maxHp;
              
              enemies.push({
                 ...template,
@@ -272,12 +273,13 @@ const App: React.FC = () => {
         if (isBoss && gameState.tier === 1) {
             setPendingRewards(0);
         } else {
-            setPendingRewards(isElite ? 2 : 1);
+            // UPDATED: Always reward 1 card, even for Elites (Math Mimics)
+            setPendingRewards(1);
         }
         
         // Gold Logic
         let goldReward = 10;
-        if (isElite) goldReward = 20;
+        if (isElite) goldReward = 30; // Math Mimic gives 30 Gold base
         if (isBoss) goldReward = 50;
         
         // Difficulty Multiplier
@@ -294,7 +296,8 @@ const App: React.FC = () => {
                         ...prev.player, 
                         currentHp: remainingHp,
                         gold: prev.player.gold + goldReward
-                    }
+                    },
+                    lastRewardGold: goldReward
                 };
             }
 
@@ -310,7 +313,8 @@ const App: React.FC = () => {
                         currentHp: prev.player.maxHp, 
                         gold: prev.player.gold + goldReward,
                         poison: 0
-                    }
+                    },
+                    lastRewardGold: goldReward
                 };
             }
 
@@ -324,7 +328,8 @@ const App: React.FC = () => {
                     currentHp: Math.min(prev.player.maxHp, remainingHp + (isBoss ? 10 : 0)), // Small heal after boss
                     gold: prev.player.gold + goldReward,
                     poison: 0
-                }
+                },
+                lastRewardGold: goldReward
             };
         });
     };
@@ -446,7 +451,8 @@ const App: React.FC = () => {
                 energy: prev.player.maxEnergy,
                 block: 0,
                 poison: 0
-            }
+            },
+            lastRewardGold: 0
         }));
     };
 
@@ -566,9 +572,27 @@ const App: React.FC = () => {
             )}
 
             {gameState.screen === 'MENU' && (
-                <div className="flex flex-col items-center justify-center h-full bg-slate-900 bg-menu-pattern bg-cover bg-center relative">
+                <div 
+                    className="flex flex-col items-center justify-center h-full bg-slate-900 relative"
+                    style={{ 
+                        backgroundImage: "url('https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=2070&auto=format&fit=crop')", 
+                        backgroundSize: 'cover', 
+                        backgroundPosition: 'center' 
+                    }}
+                >
                     <div className="bg-black/60 p-10 rounded-2xl backdrop-blur-sm text-center border border-white/10 relative">
-                        <h1 className="text-6xl font-serif mb-2 text-transparent bg-clip-text bg-gradient-title drop-shadow-lg">MATH SPIRE</h1>
+                        <h1 
+                            className="text-6xl font-serif mb-2 font-bold drop-shadow-lg"
+                            style={{ 
+                                background: 'linear-gradient(to right, #fde68a, #f59e0b, #ef4444)', 
+                                WebkitBackgroundClip: 'text', 
+                                WebkitTextFillColor: 'transparent', 
+                                backgroundClip: 'text', 
+                                color: 'transparent' 
+                            }}
+                        >
+                            MATH SPIRE
+                        </h1>
                         <p className="text-xl text-gray-300 mb-8 font-light">Climb the tower. Solve the equations.</p>
                         <button 
                             onClick={startGame}
@@ -634,6 +658,7 @@ const App: React.FC = () => {
                     type={nodeType === 'rest' ? 'rest' : 'combat'} 
                     playerDeck={gameState.player.deck}
                     playerGold={gameState.player.gold}
+                    earnedGold={gameState.lastRewardGold}
                     showTutorial={!rewardTutorialSeen && nodeType !== 'rest'}
                     onTutorialClose={() => setRewardTutorialSeen(true)}
                 />

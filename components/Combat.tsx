@@ -699,6 +699,17 @@ export const Combat: React.FC<CombatProps> = ({
           return { type: 'defend' as const, value: 4 };
       }
 
+      // Math Mimic Logic (Peek-a-boo pattern)
+      if (enemy && enemy.id.includes('math_mimic')) {
+          if (lastType === 'defend') {
+              // Open up and attack
+              return { type: 'attack' as const, value: 8 + tier };
+          } else {
+              // Close up and defend heavily
+              return { type: 'defend' as const, value: 12 };
+          }
+      }
+
       // Default Logic
       if (lastType === 'defend') {
            return { type: 'attack' as const, value: Math.floor(Math.random() * 2) + 1 + tier };
@@ -726,9 +737,9 @@ export const Combat: React.FC<CombatProps> = ({
       )}
 
       {turnPhase === 'TARGETING' && (
-          <div className="absolute top-20 left-0 w-full text-center z-50 pointer-events-none">
-              <div className="inline-block bg-black/70 px-8 py-3 rounded-full border-2 border-red-500 animate-pulse">
-                  <span className="text-2xl font-bold text-red-100 flex items-center gap-3">
+          <div className="absolute top-10 md:top-20 left-0 w-full text-center z-50 pointer-events-none">
+              <div className="inline-block bg-black/70 px-4 py-2 md:px-8 md:py-3 rounded-full border-2 border-red-500 animate-pulse">
+                  <span className="text-lg md:text-2xl font-bold text-red-100 flex items-center gap-3">
                       <Target className="animate-spin-slow" /> SELECT TARGET
                   </span>
               </div>
@@ -736,9 +747,9 @@ export const Combat: React.FC<CombatProps> = ({
       )}
 
       {turnPhase === 'HAND_SELECTION' && (
-           <div className="absolute top-20 left-0 w-full text-center z-50 pointer-events-none">
-              <div className="inline-block bg-black/70 px-8 py-3 rounded-full border-2 border-amber-500 animate-pulse">
-                  <span className="text-2xl font-bold text-amber-100 flex items-center gap-3">
+           <div className="absolute top-10 md:top-20 left-0 w-full text-center z-50 pointer-events-none">
+              <div className="inline-block bg-black/70 px-4 py-2 md:px-8 md:py-3 rounded-full border-2 border-amber-500 animate-pulse">
+                  <span className="text-lg md:text-2xl font-bold text-amber-100 flex items-center gap-3">
                       <Hand className="animate-bounce" /> 
                       {handSelectionEffect === 'exhaust_draw_1' || handSelectionEffect === 'exhaust_draw_2' ? "SELECT CARD TO EXHAUST" : 
                        handSelectionEffect === 'reduce_cost' ? "SELECT CARD TO MODIFY" : 
@@ -751,7 +762,7 @@ export const Combat: React.FC<CombatProps> = ({
       {effects.map(effect => (
           <div 
             key={effect.id}
-            className={`absolute z-50 pointer-events-none font-bold text-2xl md:text-4xl drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] animate-float-damage
+            className={`absolute z-50 pointer-events-none font-bold text-xl md:text-4xl drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] animate-float-damage
                 ${effect.type === 'damage' ? 'text-red-500' : effect.type === 'block' ? 'text-blue-400' : 'text-yellow-300'}`}
             style={{ left: `${effect.x}%`, top: `${effect.y}%` }}
           >
@@ -762,13 +773,14 @@ export const Combat: React.FC<CombatProps> = ({
       {playerFlash && <div className="absolute inset-0 bg-red-500/20 z-40 animate-flash-hit pointer-events-none" />}
 
       {/* ARENA */}
-      <div className="flex-1 flex flex-col justify-between p-2 md:p-4 relative z-10">
+      <div className="flex-1 flex flex-col justify-between p-1 md:p-4 relative z-10">
         
-        <div className="flex-1 flex items-center justify-between px-4 md:px-12 relative pt-4 md:pt-10">
+        {/* Adjusted padding top for smaller screens to ensure visibility below potential browser UI/Tabs */}
+        <div className="flex-1 flex items-center justify-between px-2 md:px-12 relative pt-2 md:pt-10">
             <div className={`transition-transform duration-100 ${playerShake ? 'translate-x-[-10px] grayscale' : ''}`}>
                  <div className="relative">
                       {turnDamageBonus > 0 && (
-                          <div className="absolute -top-16 md:-top-20 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce-slow">
+                          <div className="absolute -top-12 md:-top-20 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce-slow">
                               <div className="bg-red-600 text-white px-2 py-0.5 md:px-3 md:py-1 rounded-full border-2 border-red-400 font-bold text-[10px] md:text-xs shadow-lg mb-1">
                                   +{turnDamageBonus} DMG
                               </div>
@@ -778,7 +790,7 @@ export const Combat: React.FC<CombatProps> = ({
                  </div>
             </div>
 
-            <div className="flex items-end justify-center gap-1 md:gap-4 min-w-[150px] md:min-w-[300px]">
+            <div className="flex items-end justify-center gap-0 md:gap-4 min-w-[120px] md:min-w-[300px]">
                 {enemies.filter(e => e.currentHp > 0).map(enemy => (
                     <div key={enemy.id} className="relative">
                          {enemyFlashes[enemy.id] && <div className="absolute inset-0 w-full h-full bg-white/50 z-20 animate-slash rotate-45 scale-150" style={{ background: 'linear-gradient(transparent, white, transparent)'}}></div>}
@@ -794,27 +806,28 @@ export const Combat: React.FC<CombatProps> = ({
             </div>
         </div>
 
-        {/* HAND */}
-        <div className="h-[30%] min-h-[200px] max-h-[280px] flex flex-col justify-end relative z-20">
-            <div className="absolute left-2 md:left-10 top-0 z-20 flex flex-col items-center gap-2">
+        {/* HAND - ADJUSTED HEIGHT FOR CHROMEBOOKS */}
+        {/* Changed min-h to 160px from 200px to allow fitting on 768px height screens with browser bars */}
+        <div className="h-[35%] min-h-[160px] max-h-[260px] flex flex-col justify-end relative z-20">
+            <div className="absolute left-1 md:left-10 top-0 z-20 flex flex-col items-center gap-1 md:gap-2">
                 <div className="relative group">
-                    <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center border-4 border-amber-200 relative overflow-hidden transition-transform group-hover:scale-105">
+                    <div className="w-10 h-10 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center border-2 md:border-4 border-amber-200 relative overflow-hidden transition-transform group-hover:scale-105">
                         <Zap className="absolute w-[120%] h-[120%] text-yellow-900/20 fill-yellow-900/20 rotate-12 -z-0" />
-                        <span className="text-lg md:text-3xl font-black text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)] z-10 relative leading-none mt-1">
+                        <span className="text-base md:text-3xl font-black text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)] z-10 relative leading-none mt-0.5 md:mt-1">
                             {player.energy}/{player.maxEnergy}
                         </span>
                     </div>
                 </div>
-                <div className="bg-black/60 px-2 py-1 rounded-full border border-yellow-500/30 text-yellow-400 flex items-center gap-1 text-xs md:text-sm font-bold">
-                    <Coins size={14} /> {player.gold}
+                <div className="bg-black/60 px-2 py-0.5 md:py-1 rounded-full border border-yellow-500/30 text-yellow-400 flex items-center gap-1 text-[10px] md:text-sm font-bold">
+                    <Coins size={12} className="md:w-3.5 md:h-3.5" /> {player.gold}
                 </div>
             </div>
 
-            <div className="absolute left-2 md:left-4 bottom-2 md:bottom-4 text-[10px] md:text-xs font-bold text-slate-500 flex flex-col gap-1 z-30">
-                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative">
+            <div className="absolute left-1 md:left-4 bottom-1 md:bottom-4 text-[9px] md:text-xs font-bold text-slate-500 flex flex-col gap-1 z-30">
+                <div className="bg-slate-800 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative">
                     Draw: {player.drawPile.length}
                 </div>
-                <div className="bg-slate-800 px-2 py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative">
+                <div className="bg-slate-800 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative">
                     Discard: {player.discardPile.length}
                 </div>
             </div>
@@ -823,29 +836,30 @@ export const Combat: React.FC<CombatProps> = ({
                 <button 
                     disabled={turnPhase !== 'PLAYER' || showTutorial}
                     onClick={endTurn}
-                    className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-2 px-4 md:py-3 md:px-8 rounded-full shadow-lg border-2 border-amber-400 disabled:border-slate-600 transition-all active:scale-95 flex items-center gap-2 hover:shadow-amber-500/20 text-xs md:text-base cursor-pointer"
+                    className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-1.5 px-3 md:py-3 md:px-8 rounded-full shadow-lg border-2 border-amber-400 disabled:border-slate-600 transition-all active:scale-95 flex items-center gap-2 hover:shadow-amber-500/20 text-xs md:text-base cursor-pointer"
                 >
-                    End Turn <RotateCcw size={16} />
+                    End Turn <RotateCcw size={14} className="md:w-4 md:h-4" />
                 </button>
             </div>
 
-            <div className="flex justify-center items-end w-full px-4 md:px-10 pb-2 md:pb-4 h-full overflow-visible">
+            <div className="flex justify-center items-end w-full px-2 md:px-10 pb-1 md:pb-4 h-full overflow-visible">
                 {player.hand.map((card, idx) => {
                     const totalCards = player.hand.length;
                     const middleIndex = (totalCards - 1) / 2;
                     const offset = idx - middleIndex;
                     const rotation = offset * 5; 
-                    const translateY = Math.abs(offset) * 10; 
+                    const translateY = Math.abs(offset) * 8; // Reduced translation curve
                     const isSelected = pendingCard?.id === card.id;
                     const isHovered = hoveredCardId === card.id;
-                    const squeeze = totalCards > 5 ? -45 : -25;
+                    // Adjusted squeeze for smaller cards
+                    const squeeze = totalCards > 5 ? -35 : -15; 
                     const style = {
                         marginLeft: idx === 0 ? 0 : `${squeeze}px`,
                         zIndex: isSelected ? 50 : (isHovered ? 40 : idx),
                         transform: isSelected 
-                            ? 'translateY(-120px) scale(1.1) rotate(0deg)' 
+                            ? 'translateY(-100px) scale(1.1) rotate(0deg)' 
                             : isHovered 
-                                ? 'translateY(-100px) scale(1.1) rotate(0deg)' 
+                                ? 'translateY(-80px) scale(1.1) rotate(0deg)' 
                                 : `rotate(${rotation}deg) translateY(${translateY}px)`,
                         transition: 'transform 0.2s cubic-bezier(0.1, 0.7, 0.1, 1), margin 0.2s',
                     };
@@ -869,7 +883,7 @@ export const Combat: React.FC<CombatProps> = ({
       </div>
 
       {/* LOG */}
-      <div className="hidden lg:flex w-64 xl:w-72 h-full bg-slate-950/80 border-l border-slate-800 p-4 flex-col backdrop-blur-md relative z-10 shrink-0">
+      <div className="hidden xl:flex w-72 h-full bg-slate-950/80 border-l border-slate-800 p-4 flex-col backdrop-blur-md relative z-10 shrink-0">
           <div className="flex items-center gap-2 mb-4 text-amber-500 border-b border-slate-800 pb-2">
               <ScrollText size={20} />
               <h3 className="font-serif font-bold uppercase tracking-wider text-sm">Combat Log</h3>

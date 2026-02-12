@@ -16,27 +16,28 @@ export const PlayerComponent: React.FC<PlayerProps> = ({ player, isBlocking = fa
        
        {/* Visual Block Effect Overlay */}
        {isBlocking && (
-          <div className="absolute top-0 w-32 h-32 md:w-48 md:h-48 lg:w-64 lg:h-64 rounded-full border-4 border-blue-400 bg-blue-500/20 animate-block-flash z-20 pointer-events-none mix-blend-screen"></div>
+          <div className="absolute top-0 w-28 h-28 md:w-40 md:h-40 lg:w-48 lg:h-48 rounded-full border-4 border-blue-400 bg-blue-500/20 animate-block-flash z-20 pointer-events-none mix-blend-screen"></div>
        )}
 
        {/* Block Icon floating above */}
        {player.block > 0 && (
-          <div className="absolute -top-8 md:-top-12 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-2 py-0.5 md:px-3 md:py-1 rounded-full shadow-lg border-2 border-blue-400 flex items-center gap-1 font-bold z-10 animate-bounce-slow text-xs md:text-base">
-            <Shield size={14} className="fill-white md:w-4 md:h-4" />
+          <div className="absolute -top-6 md:-top-10 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-lg border-2 border-blue-400 flex items-center gap-1 font-bold z-10 animate-bounce-slow text-xs">
+            <Shield size={12} className="fill-white md:w-3 md:h-3" />
             <span>{player.block}</span>
           </div>
        )}
 
        {/* Poison Icon */}
        {player.poison > 0 && (
-          <div className="absolute -top-8 md:-top-12 right-0 bg-green-900 text-green-300 px-2 py-0.5 md:px-3 md:py-1 rounded-full shadow-lg border-2 border-green-500 flex items-center gap-1 font-bold z-10 animate-pulse text-xs md:text-base">
-            <FlaskConical size={14} className="md:w-4 md:h-4" />
+          <div className="absolute -top-6 md:-top-10 right-0 bg-green-900 text-green-300 px-2 py-0.5 rounded-full shadow-lg border-2 border-green-500 flex items-center gap-1 font-bold z-10 animate-pulse text-xs">
+            <FlaskConical size={12} className="md:w-3 md:h-3" />
             <span>{player.poison}</span>
           </div>
        )}
 
       {/* Character Image - Custom SVG Student Sprite - Responsive Size */}
-      <div className="w-32 h-32 md:w-48 md:h-48 lg:w-56 lg:h-56 mb-2 relative filter drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+      {/* Reduced sizes: w-28 h-28 (112px) on base, w-40 h-40 (160px) on md */}
+      <div className="w-28 h-28 md:w-40 md:h-40 lg:w-48 lg:h-48 mb-2 relative filter drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">
          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full transform scale-x-[-1]">
             {/* Hoodie Body */}
             <path d="M60 140 Q60 180 140 180 Q140 140 140 140 L130 90 L70 90 Z" fill="#3b82f6" stroke="#1e3a8a" strokeWidth="3" />
@@ -66,15 +67,15 @@ export const PlayerComponent: React.FC<PlayerProps> = ({ player, isBlocking = fa
          </svg>
           
           {/* Floor Shadow */}
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-16 md:w-24 h-2 md:h-3 bg-black/40 rounded-[100%] blur-sm"></div>
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-14 md:w-20 h-2 bg-black/40 rounded-[100%] blur-sm"></div>
       </div>
 
       {/* HP Bar */}
-      <div className="w-full max-w-[100px] md:max-w-[140px] relative -mt-4 z-10">
-          <div className="flex justify-between text-xs font-bold text-white mb-1 px-1 shadow-black drop-shadow-md">
-             <span className="flex items-center gap-1 text-red-300"><Heart size={12} className="text-red-500 fill-red-500"/> {player.currentHp}/{player.maxHp}</span>
+      <div className="w-full max-w-[90px] md:max-w-[120px] relative -mt-3 z-10">
+          <div className="flex justify-between text-[10px] font-bold text-white mb-0.5 px-1 shadow-black drop-shadow-md">
+             <span className="flex items-center gap-1 text-red-300"><Heart size={10} className="text-red-500 fill-red-500"/> {player.currentHp}/{player.maxHp}</span>
           </div>
-          <div className="h-2 md:h-3 bg-gray-900 rounded-full border border-gray-600 overflow-hidden relative shadow-inner">
+          <div className="h-1.5 md:h-2.5 bg-gray-900 rounded-full border border-gray-600 overflow-hidden relative shadow-inner">
             <div 
                 className="h-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-500 ease-out"
                 style={{ width: `${hpPercent}%` }}

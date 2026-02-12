@@ -11,6 +11,7 @@ interface CardRewardProps {
   type?: 'rest' | 'combat';
   playerDeck?: CardType[];
   playerGold?: number;
+  earnedGold?: number; // New prop to display gold earned from combat
   showTutorial?: boolean;
   onTutorialClose?: () => void;
 }
@@ -21,6 +22,7 @@ export const CardReward: React.FC<CardRewardProps> = ({
     type = 'combat', 
     playerDeck = [], 
     playerGold = 0,
+    earnedGold = 0,
     showTutorial = false, 
     onTutorialClose 
 }) => {
@@ -194,7 +196,7 @@ export const CardReward: React.FC<CardRewardProps> = ({
                 Claim your reward: Add a card to your deck.
             </p>
             <div className="bg-black/50 px-4 py-1 rounded-full border border-yellow-500/30 text-yellow-400 flex items-center gap-2">
-                <Coins size={16} /> +Gold
+                <Coins size={16} /> +{earnedGold} Gold
             </div>
         </div>
 
