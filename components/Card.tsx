@@ -22,14 +22,19 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
   // xl: w-36 h-52 (144px x 208px) - Only for truly large screens
   const baseClasses = "relative w-24 h-36 md:w-28 md:h-40 xl:w-36 xl:h-52 rounded-xl border-2 transition-all duration-200 transform select-none cursor-pointer flex flex-col overflow-hidden shadow-lg";
   
-  // Base background/border logic
+  // Base background/border logic with FALLBACK Styles
   let typeClasses = "";
+  let fallbackStyle = {};
+
   if (isAttack) {
       typeClasses = "bg-rose-900 border-rose-500 hover:bg-rose-800 text-rose-50";
+      fallbackStyle = { backgroundColor: '#881337', borderColor: '#f43f5e', color: '#fff1f2' };
   } else if (isSkill) {
       typeClasses = "bg-slate-800 border-slate-400 hover:bg-slate-700 text-slate-50";
+      fallbackStyle = { backgroundColor: '#1e293b', borderColor: '#94a3b8', color: '#f8fafc' };
   } else {
       typeClasses = "bg-amber-900 border-amber-500 hover:bg-amber-800 text-amber-50";
+      fallbackStyle = { backgroundColor: '#78350f', borderColor: '#f59e0b', color: '#fffbeb' };
   }
 
   // Upgraded Override
@@ -90,6 +95,7 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, disabled, pl
   return (
     <div 
       className={`${baseClasses} ${typeClasses} ${interactClasses}`}
+      style={fallbackStyle} 
       onClick={() => (playable && !disabled) && onClick(card)}
     >
       {/* Energy Cost Badge */}

@@ -809,7 +809,9 @@ export const Combat: React.FC<CombatProps> = ({
         {/* HAND - ADJUSTED HEIGHT FOR CHROMEBOOKS */}
         {/* Changed min-h to 160px from 200px to allow fitting on 768px height screens with browser bars */}
         <div className="h-[35%] min-h-[160px] max-h-[260px] flex flex-col justify-end relative z-20">
-            <div className="absolute left-1 md:left-10 top-0 z-20 flex flex-col items-center gap-1 md:gap-2">
+            
+            {/* ENERGY & GOLD - MOVED UP */}
+            <div className="absolute left-1 md:left-4 -top-16 md:-top-20 z-20 flex flex-col items-center gap-1 md:gap-2">
                 <div className="relative group">
                     <div className="w-10 h-10 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center border-2 md:border-4 border-amber-200 relative overflow-hidden transition-transform group-hover:scale-105">
                         <Zap className="absolute w-[120%] h-[120%] text-yellow-900/20 fill-yellow-900/20 rotate-12 -z-0" />
@@ -823,16 +825,18 @@ export const Combat: React.FC<CombatProps> = ({
                 </div>
             </div>
 
-            <div className="absolute left-1 md:left-4 bottom-1 md:bottom-4 text-[9px] md:text-xs font-bold text-slate-500 flex flex-col gap-1 z-30">
-                <div className="bg-slate-800 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative">
+            {/* DECK PILES - MOVED UP TO AVOID BOTTOM BAR */}
+            <div className="absolute left-1 md:left-4 bottom-2 md:bottom-6 text-[9px] md:text-xs font-bold text-slate-500 flex flex-col gap-1 z-30 pointer-events-none">
+                <div className="bg-slate-800/90 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-slate-700 relative text-slate-300">
                     Draw: {player.drawPile.length}
                 </div>
-                <div className="bg-slate-800 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-slate-700 cursor-help hover:border-amber-500 hover:text-slate-300 transition-colors relative">
+                <div className="bg-slate-800/90 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-slate-700 relative text-slate-300">
                     Discard: {player.discardPile.length}
                 </div>
             </div>
 
-            <div className="absolute right-2 md:right-4 top-0 z-20">
+            {/* END TURN - MOVED UP SLIGHTLY */}
+            <div className="absolute right-2 md:right-6 -top-10 md:-top-16 z-20">
                 <button 
                     disabled={turnPhase !== 'PLAYER' || showTutorial}
                     onClick={endTurn}
