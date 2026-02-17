@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { GameState, Card, MapNode, Enemy } from './types';
 import { CARDS, STARTING_DECK_IDS, ENEMIES, GENERATE_MAP, INITIAL_PLAYER_HP, INITIAL_MAX_ENERGY } from './constants';
@@ -6,7 +7,7 @@ import { Combat } from './components/Combat';
 import { EventRoom } from './components/EventRoom';
 import { CardReward } from './components/CardReward';
 import { TierTransition } from './components/TierTransition';
-import { Play, RotateCw, Wrench, Lock, X, Bug, Trophy, Unlock, Skull, FastForward, Sparkles, ArrowLeft } from 'lucide-react';
+import { Play, RotateCw, Wrench, X, Bug, Trophy, Skull, FastForward, ArrowLeft } from 'lucide-react';
 
 const createInitialDeck = (): Card[] => {
     return STARTING_DECK_IDS.map(id => ({
