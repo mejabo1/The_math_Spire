@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Card as CardType } from '../types';
-import { CARDS, REWARD_POOL_IDS } from '../constants';
+import { CARDS, REWARD_POOL_IDS, TIER_3_REWARD_IDS } from '../constants';
 import { CardComponent } from './Card';
 import { Tent, Trophy, Info, Heart, Hammer, Coins, ArrowLeft } from 'lucide-react';
 
@@ -14,6 +14,7 @@ interface CardRewardProps {
   earnedGold?: number; // New prop to display gold earned from combat
   showTutorial?: boolean;
   onTutorialClose?: () => void;
+  tier?: number;
 }
 
 export const CardReward: React.FC<CardRewardProps> = ({ 
@@ -24,20 +25,26 @@ export const CardReward: React.FC<CardRewardProps> = ({
     playerGold = 0,
     earnedGold = 0,
     showTutorial = false, 
-    onTutorialClose 
+    onTutorialClose,
+    tier = 1
 }) => {
   const [restView, setRestView] = useState<'selection' | 'deck_upgrade'>('selection');
 
   // Combat Reward Cards
   const rewardCards = useMemo(() => {
     if (type === 'rest') return [];
-    const shuffled = [...REWARD_POOL_IDS].sort(() => 0.5 - Math.random());
+    
+    // Select correct pool based on Tier
+    const pool = tier === 3 ? TIER_3_REWARD_IDS : REWARD_POOL_IDS;
+
+    const shuffled = [...pool].sort(() => 0.5 - Math.random());
     const selectedIds = shuffled.slice(0, 3);
+    
     return selectedIds.map(id => ({
         ...CARDS[id],
         id: `reward_${id}`
     }) as CardType);
-  }, [type]);
+  }, [type, tier]);
 
   const isRest = type === 'rest';
   const upgradeCost = 20;

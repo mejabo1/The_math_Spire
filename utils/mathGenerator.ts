@@ -80,8 +80,9 @@ const generateOptions = (correct: number | string, type: 'number' | 'string' = '
 // ... Generators with Tier Scaling ...
 
 const generateAddition = (tier: number): MathProblem => {
-  const min = tier === 1 ? 10 : 100;
-  const max = tier === 1 ? 99 : 999;
+  // Tier 3 reduced from 9999 to 999 to make typing/mental math feasible
+  const min = tier >= 3 ? 100 : (tier === 1 ? 10 : 100);
+  const max = tier >= 3 ? 999 : (tier === 1 ? 99 : 999);
   const a = getRandomInt(min, max);
   const b = getRandomInt(min, max);
   const ans = a + b;
@@ -89,8 +90,9 @@ const generateAddition = (tier: number): MathProblem => {
 };
 
 const generateSubtraction = (tier: number): MathProblem => {
-  const min = tier === 1 ? 20 : 200;
-  const max = tier === 1 ? 99 : 999;
+  // Tier 3 reduced from 9999 to 999
+  const min = tier >= 3 ? 200 : (tier === 1 ? 20 : 200);
+  const max = tier >= 3 ? 999 : (tier === 1 ? 99 : 999);
   const a = getRandomInt(min, max);
   const b = getRandomInt(min/2, a - 1);
   const ans = a - b;
@@ -98,17 +100,25 @@ const generateSubtraction = (tier: number): MathProblem => {
 };
 
 const generateMultiplication = (tier: number): MathProblem => {
-  const min = tier === 1 ? 3 : 8;
-  const max = tier === 1 ? 12 : 20;
-  const a = getRandomInt(min, max);
-  const b = getRandomInt(3, 12);
+  let a, b;
+  if (tier >= 3) {
+      // Tier 3 reduced to 10-15 * 2-9
+      a = getRandomInt(10, 15);
+      b = getRandomInt(2, 9);
+  } else {
+      const min = tier === 1 ? 3 : 8;
+      const max = tier === 1 ? 12 : 20;
+      a = getRandomInt(min, max);
+      b = getRandomInt(3, 12);
+  }
   const ans = a * b;
   return { question: `${a} × ${b} = ?`, options: generateOptions(ans), correctAnswer: ans.toString(), topic: 'Multiplication' };
 };
 
 const generateDivision = (tier: number): MathProblem => {
-  const b = getRandomInt(tier === 1 ? 3 : 5, tier === 1 ? 12 : 15);
-  const ans = getRandomInt(4, tier === 1 ? 15 : 25);
+  const b = getRandomInt(tier === 1 ? 3 : 5, tier === 1 ? 12 : 12);
+  // Tier 3 reduced max answer from 35 to 20
+  const ans = getRandomInt(4, tier >= 3 ? 20 : (tier === 1 ? 15 : 25));
   const a = b * ans;
   return { question: `${a} ÷ ${b} = ?`, options: generateOptions(ans), correctAnswer: ans.toString(), topic: 'Division' };
 };
@@ -116,7 +126,8 @@ const generateDivision = (tier: number): MathProblem => {
 const generateIntegerProblem = (tier: number): MathProblem => {
   const ops = ['+', '-'];
   const op = ops[getRandomInt(0, 1)];
-  const range = tier === 1 ? 15 : 50;
+  // Tier 3 reduced range from 100 to 50
+  const range = tier >= 3 ? 50 : (tier === 1 ? 15 : 50);
   let a = getRandomInt(-range, range);
   let b = getRandomInt(-range, range);
   const bStr = b < 0 ? `(${b})` : `${b}`;
@@ -126,7 +137,7 @@ const generateIntegerProblem = (tier: number): MathProblem => {
 
 const generateExponent = (tier: number): MathProblem => {
     const base = getRandomInt(2, tier === 1 ? 9 : 12);
-    const power = base <= 3 ? getRandomInt(2, tier === 1 ? 4 : 5) : 2;
+    const power = base <= 3 ? getRandomInt(2, tier >= 3 ? 4 : (tier === 1 ? 3 : 4)) : 2; // Capped power at 4 for Tier 3 small bases
     const ans = Math.pow(base, power);
     return { question: `${base}^${power} = ?`, options: generateOptions(ans), correctAnswer: ans.toString(), topic: 'Exponents' };
 };
@@ -137,8 +148,8 @@ const generateArithmetic = (tier: number): MathProblem => {
   let a = 0, b = 0, ans = 0;
   
   if (op === '*') { 
-      a = getRandomInt(2, tier === 1 ? 9 : 15); 
-      b = getRandomInt(2, tier === 1 ? 9 : 15); 
+      a = getRandomInt(2, tier === 1 ? 9 : 12); 
+      b = getRandomInt(2, tier === 1 ? 9 : 12); 
       ans = a * b; 
   } else if (op === '-') { 
       a = getRandomInt(5, tier === 1 ? 20 : 100); 
@@ -158,13 +169,25 @@ const generateAlgebra = (tier: number): MathProblem => {
     const a = getRandomInt(1, 9);
     const b = x + a;
     return { question: `Find x: x + ${a} = ${b}`, options: generateOptions(x), correctAnswer: x.toString(), topic: 'Algebra' };
-  } else {
+  } else if (tier === 2) {
     // 2x + 5 = 15
     const x = getRandomInt(2, 12);
     const m = getRandomInt(2, 5);
     const a = getRandomInt(1, 10);
     const b = (m * x) + a;
     return { question: `Find x: ${m}x + ${a} = ${b}`, options: generateOptions(x), correctAnswer: x.toString(), topic: 'Algebra' };
+  } else {
+      // Tier 3: 3x - 5 = 2x + 4
+      // Kept structure but ensured smaller numbers
+      const x = getRandomInt(2, 10);
+      const m1 = getRandomInt(3, 5);
+      const m2 = getRandomInt(1, m1 - 1);
+      const diffM = m1 - m2;
+      const sub = getRandomInt(1, 10);
+      // m1*x - sub = m2*x + ???
+      // (m1-m2)x - sub = RHS_const
+      const rhs = (diffM * x) - sub;
+      return { question: `Find x: ${m1}x - ${sub} = ${m2}x + ${rhs}`, options: generateOptions(x), correctAnswer: x.toString(), topic: 'Algebra' };
   }
 };
 

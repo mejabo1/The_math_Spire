@@ -47,15 +47,15 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
             </div>
         )}
         
-        {/* Responsive Map Container: Reduced from 85vmin to 75vmin to fit better vertically on wide/short screens */}
+        {/* Responsive Map Container: Increased back to 85vmin/90vmin to fill screen */}
         <div 
-            className="relative w-[75vmin] h-[75vmin] max-w-[600px] max-h-[600px] bg-slate-800 rounded-full shadow-2xl border-4 border-slate-700 overflow-hidden shrink-0"
+            className="relative w-[85vmin] h-[85vmin] max-w-[700px] max-h-[700px] bg-slate-800 rounded-full shadow-2xl border-4 border-slate-700 overflow-hidden shrink-0"
             style={{ 
                 position: 'relative', 
                 borderRadius: '9999px', 
                 margin: 'auto',
-                width: '75vmin', /* Inline fallback */
-                height: '75vmin' /* Inline fallback */
+                width: '85vmin', /* Inline fallback */
+                height: '85vmin' /* Inline fallback */
             }}
         >
              {/* Simple Background Pattern */}
@@ -90,8 +90,8 @@ export const GameMap: React.FC<MapProps> = ({ mapNodes, currentNodeId, onNodeSel
                 const isCurrent = node.id === currentNodeId;
                 const isCompleted = node.completed;
 
-                // Responsive node size: Reduced slightly
-                let nodeClass = "absolute transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 md:w-16 md:h-16 rounded-full flex items-center justify-center border-2 md:border-4 transition-all duration-300 z-10 ";
+                // Responsive node size: Increased back up
+                let nodeClass = "absolute transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 md:w-16 md:h-16 rounded-full flex items-center justify-center border-2 md:border-4 transition-all duration-300 z-10 ";
                 
                 if (isCurrent) {
                     nodeClass += "bg-amber-500 border-white shadow-[0_0_20px_rgba(245,158,11,0.6)] scale-125 text-white";

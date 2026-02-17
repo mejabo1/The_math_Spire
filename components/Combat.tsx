@@ -8,8 +8,8 @@ import { MathModal } from './MathModal';
 import { TutorialModal } from './TutorialModal';
 import { generateProblem, MathProblem } from '../utils/mathGenerator';
 import { BOSS_PUNS, BOSS_ATTACK_TAUNTS, drawCards, getEffectTargetType } from '../utils/combatUtils';
-import { Zap, RotateCcw, ScrollText, Shield as ShieldIcon, Target, Coins, Hand } from 'lucide-react';
-import { HAND_SIZE } from '../constants';
+import { Zap, RotateCcw, ScrollText, Shield as ShieldIcon, Target, Coins, Hand, FileText } from 'lucide-react';
+import { HAND_SIZE, SVG_BOSS_INFINITE_TRUE_FORM, SVG_TEACHER } from '../constants';
 
 interface CombatProps {
   player: Player;
@@ -75,6 +75,10 @@ export const Combat: React.FC<CombatProps> = ({
   const [enemyFlashes, setEnemyFlashes] = useState<Record<string, boolean>>({});
   const [enemyTaunts, setEnemyTaunts] = useState<Record<string, string | null>>({});
   const [bossHitCounter, setBossHitCounter] = useState<Record<string, number>>({});
+
+  // Special Boss Event State
+  const [hasGremillionRevived, setHasGremillionRevived] = useState(false);
+  const [showGremillion, setShowGremillion] = useState(false);
 
   const addLog = (message: string) => {
       setCombatLog(prev => [...prev, message]);
@@ -166,6 +170,8 @@ export const Combat: React.FC<CombatProps> = ({
     setTurnPhase('PLAYER');
   };
 
+  // ... (handleHandCardClick, handleCardClick, handleEnemyClick, handleMathAnswer, handleMathCancel, playCard, finalizeCardPlay, resolveCardEffect - Unchanged)
+  
   const handleHandCardClick = (targetCard: CardType) => {
       if (turnPhase !== 'HAND_SELECTION' || !pendingCard || !handSelectionEffect) return;
       if (targetCard.id === pendingCard.id) {
@@ -344,7 +350,13 @@ export const Combat: React.FC<CombatProps> = ({
         case 'block_enemy':
             const target = getTarget();
             if (target) {
-                const amt = target.currentHp;
+                const amt = card.effectId === 'block_enemy' && card.name === 'Golden Ratio' ? player.block : target.currentHp; 
+                // If it is Golden Ratio, it doubles block, otherwise copies enemy HP
+                if (card.name === 'Golden Ratio') {
+                    triggerVfx(`Block Doubled!`, "block", "player");
+                    setPlayer(p => ({...p, block: p.block * 2 }));
+                    return;
+                }
                 triggerVfx(`+${amt} Block`, "block", "player");
                 setPlayer(p => ({ ...p, block: p.block + amt }));
             }
@@ -478,6 +490,26 @@ export const Combat: React.FC<CombatProps> = ({
                 const unblocked = amount - blocked;
                 const newHp = e.currentHp - unblocked;
                 
+                // Infinite Prime Phase Transition Check
+                if (tier === 3 && e.id.includes('boss') && (!e.phase || e.phase === 1) && newHp <= 0) {
+                     triggerVfx("INFINITE!", "info", e.id);
+                     showEnemyTaunt(e.id, "How can you defeat that which is infinite?");
+                     
+                     setTimeout(() => {
+                         showEnemyTaunt(e.id, "Behold my true form!");
+                     }, 2500);
+
+                     return {
+                         ...e,
+                         currentHp: 70,
+                         maxHp: 70,
+                         phase: 2,
+                         image: SVG_BOSS_INFINITE_TRUE_FORM,
+                         name: "The Infinite Prime (True Form)",
+                         block: 0
+                     };
+                }
+
                 if (blocked > 0) {
                     triggerVfx(`Blocked ${blocked}`, "block", e.id);
                 }
@@ -495,7 +527,7 @@ export const Combat: React.FC<CombatProps> = ({
                     setBossHitCounter(prev => ({ ...prev, [e.id]: currentHitCount }));
 
                     let taunt: string | null = null;
-                    if (newHp > 0 && newHp < 10) {
+                    if (newHp > 0 && newHp < 10 && (!e.phase || e.phase === 2)) { // Only taunt low HP if in Phase 2 or normal boss
                         taunt = "What manner of creature are you!?";
                     } else if (currentHitCount % 3 === 0) {
                         taunt = BOSS_PUNS[Math.floor(Math.random() * BOSS_PUNS.length)];
@@ -517,9 +549,32 @@ export const Combat: React.FC<CombatProps> = ({
                 setPlayerBlockAnim(true);
                 setTimeout(() => setPlayerBlockAnim(false), 600); 
             }
-            if (unblocked > 0) { triggerVfx(unblocked.toString(), "damage", "player"); triggerPlayerShake(); }
-            else { triggerVfx("Blocked!", "block", "player"); }
-            return { ...prev, block: prev.block - blocked, currentHp: prev.currentHp - unblocked };
+            
+            let newHp = prev.currentHp - unblocked;
+
+            if (unblocked > 0) {
+                // Trigger shake visual
+                triggerPlayerShake();
+                triggerVfx(unblocked.toString(), "damage", "player");
+
+                // --- SPECIAL EVENT: Mr. Gremillion's Homework Pass ---
+                // If player is dying in Tier 3 boss fight and hasn't used the pass yet
+                const isFinalBoss = tier === 3 && enemies.some(e => e.id.includes('boss-infinite'));
+                if (newHp <= 0 && isFinalBoss && !hasGremillionRevived) {
+                    // Trigger the save!
+                    newHp = prev.maxHp; // Full Heal
+                    setHasGremillionRevived(true);
+                    setShowGremillion(true);
+                    addLog("Mr. Gremillion uses a Homework Pass!");
+                    
+                    // Hide the overlay after a delay
+                    setTimeout(() => setShowGremillion(false), 4000);
+                }
+            } else {
+                 triggerVfx("Blocked!", "block", "player"); 
+            }
+            
+            return { ...prev, block: prev.block - blocked, currentHp: newHp };
         });
     }
   };
@@ -536,6 +591,8 @@ export const Combat: React.FC<CombatProps> = ({
     if (player.currentHp <= 0) { setTurnPhase('END'); onDefeat(); }
   }, [player.currentHp, onDefeat]);
 
+  // ... (endTurn, processEnemyTurn, getRandomIntent - Unchanged)
+  
   const endTurn = async () => {
     setTurnPhase('ENEMY_ANIMATING');
     addLog("--- Enemy Turn ---");
@@ -685,6 +742,38 @@ export const Combat: React.FC<CombatProps> = ({
           if (r < 0.7) return { type: 'attack' as const, value: 7 + tier }; // 30% Heavy Attack
           return { type: 'defend' as const, value: 8 }; // 30% Heavy Defend
       }
+
+      // Tier 3 Mini-Boss: The Limit Guardian
+      if (enemy && enemy.id.includes('miniboss_guardian')) {
+          if (lastType === 'defend') {
+              // After defend, heavy attack
+              return { type: 'attack' as const, value: 12 };
+          }
+          // 50/50 Chance to Defend heavy or Attack
+          const r = Math.random();
+          if (r > 0.5) return { type: 'defend' as const, value: 15 };
+          return { type: 'attack' as const, value: 9 };
+      }
+
+      // Tier 3 Boss Logic (Infinite Prime) - Relentless Scaling
+      if (enemy && enemy.id.includes('boss-infinite')) {
+           const r = Math.random();
+           // Phase 2 Logic (Usually phase is undefined or 1 initially, but updated in dealDamage)
+           const isPhase2 = enemy.phase === 2;
+           
+           if (isPhase2) {
+               // More aggressive in Phase 2
+               if (lastType === 'defend') return { type: 'attack' as const, value: 18 }; 
+               if (r < 0.1) return { type: 'defend' as const, value: 25 }; 
+               return { type: 'attack' as const, value: 12 };
+           }
+
+           if (lastType === 'defend') return { type: 'attack' as const, value: 15 }; 
+           
+           if (r < 0.2) return { type: 'defend' as const, value: 20 }; 
+           if (r < 0.6) return { type: 'attack' as const, value: 15 }; 
+           return { type: 'attack' as const, value: 8 }; 
+      }
       
       // Poison Enemy Logic
       if (enemy && enemy.id.includes('venomous')) {
@@ -727,12 +816,42 @@ export const Combat: React.FC<CombatProps> = ({
 
       {showTutorial && <TutorialModal key={tutorialType} onClose={onTutorialComplete} type={tutorialType} />}
 
+      {/* --- MR GREMILLION EVENT OVERLAY --- */}
+      {showGremillion && (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80 animate-fade-in pointer-events-none">
+              <div className="relative flex flex-col items-center">
+                  <div className="w-48 h-48 md:w-64 md:h-64 animate-bounce-slow relative z-10">
+                       <img src={SVG_TEACHER} alt="Mr. Gremillion" className="w-full h-full drop-shadow-2xl" />
+                  </div>
+                  
+                  {/* Speech Bubble */}
+                  <div className="bg-white text-slate-900 p-6 rounded-2xl shadow-2xl border-4 border-amber-500 max-w-sm text-center relative mt-4 animate-shake">
+                      <p className="text-2xl font-bold font-serif mb-2">"Here! This might help!"</p>
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-white rotate-45 border-t-4 border-l-4 border-amber-500"></div>
+                  </div>
+
+                  {/* Homework Pass Visual */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-ping-slow opacity-0 animate-[ping_1s_ease-in-out_infinite]">
+                      <div className="bg-yellow-200 border-4 border-yellow-600 p-8 rounded-lg rotate-12 shadow-2xl">
+                          <div className="flex items-center gap-2 text-yellow-900 font-bold text-3xl uppercase tracking-widest border-b-2 border-yellow-900/50 pb-2 mb-2">
+                              <FileText size={32} /> Homework Pass
+                          </div>
+                          <div className="text-center font-serif text-xl text-yellow-800">
+                              Redeem for 1 Full Heal
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {turnPhase === 'MATH_CHALLENGE' && activeProblem && pendingCard && (
           <MathModal 
             problem={activeProblem} 
             cardName={pendingCard.name}
             onAnswer={handleMathAnswer}
-            onClose={handleMathCancel} // Passed handler
+            onClose={handleMathCancel}
+            tier={tier} // Passed Tier
           />
       )}
 
@@ -772,16 +891,57 @@ export const Combat: React.FC<CombatProps> = ({
       
       {playerFlash && <div className="absolute inset-0 bg-red-500/20 z-40 animate-flash-hit pointer-events-none" />}
 
-      {/* ARENA */}
-      <div className="flex-1 flex flex-col justify-between p-1 md:p-4 relative z-10">
+      {/* --- UI OVERLAY LAYER (Absolute Positioned for safety) --- */}
+      
+      {/* 1. ENERGY & GOLD - Fixed Top-Left */}
+      <div className="absolute top-4 left-4 z-30 flex flex-col items-center gap-2 pointer-events-none">
+          <div className="relative group">
+              <div className="w-16 h-16 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center border-4 border-amber-200 relative overflow-hidden transition-transform group-hover:scale-105">
+                  <Zap className="absolute w-[120%] h-[120%] text-yellow-900/20 fill-yellow-900/20 rotate-12 -z-0" />
+                  <span className="text-3xl md:text-4xl font-black text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)] z-10 relative leading-none mt-1">
+                      {player.energy}/{player.maxEnergy}
+                  </span>
+              </div>
+          </div>
+          <div className="bg-black/60 px-4 py-1.5 rounded-full border border-yellow-500/30 text-yellow-400 flex items-center gap-2 text-sm md:text-base font-bold backdrop-blur-sm">
+              <Coins size={18} /> {player.gold}
+          </div>
+      </div>
+
+      {/* 2. DECK PILES - Fixed Bottom-Left */}
+      <div className="absolute bottom-4 left-4 flex flex-col gap-2 z-30 pointer-events-none text-xs md:text-sm font-bold text-slate-500">
+          <div className="bg-slate-800/90 px-3 py-1.5 md:px-4 md:py-2 rounded border border-slate-700 relative text-slate-300 shadow-lg">
+              Draw: {player.drawPile.length}
+          </div>
+          <div className="bg-slate-800/90 px-3 py-1.5 md:px-4 md:py-2 rounded border border-slate-700 relative text-slate-300 shadow-lg">
+              Discard: {player.discardPile.length}
+          </div>
+      </div>
+
+      {/* 3. END TURN BUTTON - Fixed Bottom-Right (Above cards area) */}
+      <div className="absolute bottom-40 md:bottom-56 right-8 z-30">
+          <button 
+              disabled={turnPhase !== 'PLAYER' || showTutorial}
+              onClick={endTurn}
+              className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-6 md:py-4 md:px-10 rounded-full shadow-lg border-2 border-amber-400 disabled:border-slate-600 transition-all active:scale-95 flex items-center gap-3 hover:shadow-amber-500/20 text-sm md:text-lg cursor-pointer"
+          >
+              End Turn <RotateCcw size={20} />
+          </button>
+      </div>
+
+      {/* --- MAIN CONTENT CONTAINER --- */}
+      <div className="flex-1 flex flex-col justify-between relative z-10 w-full h-full">
         
-        {/* Adjusted padding top for smaller screens to ensure visibility below potential browser UI/Tabs */}
-        <div className="flex-1 flex items-center justify-between px-2 md:px-12 relative pt-2 md:pt-10">
+        {/* ARENA (Player & Enemies) */}
+        {/* Fill available space */}
+        <div className="flex-1 flex items-center justify-center gap-8 md:gap-32 px-4 py-8">
+            
+            {/* Player Container */}
             <div className={`transition-transform duration-100 ${playerShake ? 'translate-x-[-10px] grayscale' : ''}`}>
                  <div className="relative">
                       {turnDamageBonus > 0 && (
-                          <div className="absolute -top-12 md:-top-20 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce-slow">
-                              <div className="bg-red-600 text-white px-2 py-0.5 md:px-3 md:py-1 rounded-full border-2 border-red-400 font-bold text-[10px] md:text-xs shadow-lg mb-1">
+                          <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce-slow">
+                              <div className="bg-red-600 text-white px-3 py-1 rounded-full border-2 border-red-400 font-bold text-xs md:text-sm shadow-lg mb-1">
                                   +{turnDamageBonus} DMG
                               </div>
                           </div>
@@ -790,7 +950,8 @@ export const Combat: React.FC<CombatProps> = ({
                  </div>
             </div>
 
-            <div className="flex items-end justify-center gap-0 md:gap-4 min-w-[120px] md:min-w-[300px]">
+            {/* Enemies Container */}
+            <div className="flex items-end justify-center gap-4 md:gap-8">
                 {enemies.filter(e => e.currentHp > 0).map(enemy => (
                     <div key={enemy.id} className="relative">
                          {enemyFlashes[enemy.id] && <div className="absolute inset-0 w-full h-full bg-white/50 z-20 animate-slash rotate-45 scale-150" style={{ background: 'linear-gradient(transparent, white, transparent)'}}></div>}
@@ -806,95 +967,56 @@ export const Combat: React.FC<CombatProps> = ({
             </div>
         </div>
 
-        {/* HAND - ADJUSTED HEIGHT FOR CHROMEBOOKS */}
-        {/* Changed min-h to 160px from 200px to allow fitting on 768px height screens with browser bars */}
-        <div className="h-[35%] min-h-[160px] max-h-[260px] flex flex-col justify-end relative z-20">
-            
-            {/* ENERGY & GOLD - MOVED UP */}
-            <div className="absolute left-1 md:left-4 -top-16 md:-top-20 z-20 flex flex-col items-center gap-1 md:gap-2">
-                <div className="relative group">
-                    <div className="w-10 h-10 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center border-2 md:border-4 border-amber-200 relative overflow-hidden transition-transform group-hover:scale-105">
-                        <Zap className="absolute w-[120%] h-[120%] text-yellow-900/20 fill-yellow-900/20 rotate-12 -z-0" />
-                        <span className="text-base md:text-3xl font-black text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)] z-10 relative leading-none mt-0.5 md:mt-1">
-                            {player.energy}/{player.maxEnergy}
-                        </span>
-                    </div>
-                </div>
-                <div className="bg-black/60 px-2 py-0.5 md:py-1 rounded-full border border-yellow-500/30 text-yellow-400 flex items-center gap-1 text-[10px] md:text-sm font-bold">
-                    <Coins size={12} className="md:w-3.5 md:h-3.5" /> {player.gold}
-                </div>
-            </div>
+        {/* HAND - Fixed Height Container for Cards */}
+        {/* Increased height to allow for larger cards */}
+        <div className="h-[280px] md:h-[350px] flex items-end justify-center pb-4 md:pb-8 relative z-20 w-full px-12 md:px-24">
+            {player.hand.map((card, idx) => {
+                const totalCards = player.hand.length;
+                const middleIndex = (totalCards - 1) / 2;
+                const offset = idx - middleIndex;
+                const rotation = offset * 5; 
+                const translateY = Math.abs(offset) * 12; // Slightly increased curve
+                const isSelected = pendingCard?.id === card.id;
+                const isHovered = hoveredCardId === card.id;
+                // Adjusted squeeze for larger cards
+                const squeeze = totalCards > 5 ? -60 : -30; 
+                const style = {
+                    marginLeft: idx === 0 ? 0 : `${squeeze}px`,
+                    zIndex: isSelected ? 50 : (isHovered ? 40 : idx),
+                    transform: isSelected 
+                        ? 'translateY(-120px) scale(1.15) rotate(0deg)' 
+                        : isHovered 
+                            ? 'translateY(-100px) scale(1.15) rotate(0deg)' 
+                            : `rotate(${rotation}deg) translateY(${translateY}px)`,
+                    transition: 'transform 0.2s cubic-bezier(0.1, 0.7, 0.1, 1), margin 0.2s',
+                };
 
-            {/* DECK PILES - MOVED UP TO AVOID BOTTOM BAR */}
-            <div className="absolute left-1 md:left-4 bottom-2 md:bottom-6 text-[9px] md:text-xs font-bold text-slate-500 flex flex-col gap-1 z-30 pointer-events-none">
-                <div className="bg-slate-800/90 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-slate-700 relative text-slate-300">
-                    Draw: {player.drawPile.length}
-                </div>
-                <div className="bg-slate-800/90 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-slate-700 relative text-slate-300">
-                    Discard: {player.discardPile.length}
-                </div>
-            </div>
-
-            {/* END TURN - MOVED UP SLIGHTLY */}
-            <div className="absolute right-2 md:right-6 -top-10 md:-top-16 z-20">
-                <button 
-                    disabled={turnPhase !== 'PLAYER' || showTutorial}
-                    onClick={endTurn}
-                    className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-1.5 px-3 md:py-3 md:px-8 rounded-full shadow-lg border-2 border-amber-400 disabled:border-slate-600 transition-all active:scale-95 flex items-center gap-2 hover:shadow-amber-500/20 text-xs md:text-base cursor-pointer"
-                >
-                    End Turn <RotateCcw size={14} className="md:w-4 md:h-4" />
-                </button>
-            </div>
-
-            <div className="flex justify-center items-end w-full px-2 md:px-10 pb-1 md:pb-4 h-full overflow-visible">
-                {player.hand.map((card, idx) => {
-                    const totalCards = player.hand.length;
-                    const middleIndex = (totalCards - 1) / 2;
-                    const offset = idx - middleIndex;
-                    const rotation = offset * 5; 
-                    const translateY = Math.abs(offset) * 8; // Reduced translation curve
-                    const isSelected = pendingCard?.id === card.id;
-                    const isHovered = hoveredCardId === card.id;
-                    // Adjusted squeeze for smaller cards
-                    const squeeze = totalCards > 5 ? -35 : -15; 
-                    const style = {
-                        marginLeft: idx === 0 ? 0 : `${squeeze}px`,
-                        zIndex: isSelected ? 50 : (isHovered ? 40 : idx),
-                        transform: isSelected 
-                            ? 'translateY(-100px) scale(1.1) rotate(0deg)' 
-                            : isHovered 
-                                ? 'translateY(-80px) scale(1.1) rotate(0deg)' 
-                                : `rotate(${rotation}deg) translateY(${translateY}px)`,
-                        transition: 'transform 0.2s cubic-bezier(0.1, 0.7, 0.1, 1), margin 0.2s',
-                    };
-
-                    return (
-                        <div key={card.id} style={style} onMouseEnter={() => setHoveredCardId(card.id)} onMouseLeave={() => setHoveredCardId(null)} className="relative origin-bottom shrink-0">
-                            <div className="animate-card-deal" style={{ animationDelay: `${idx * 150}ms` }}>
-                                <CardComponent 
-                                    card={card} 
-                                    onClick={handleCardClick}
-                                    disabled={turnPhase !== 'PLAYER' && turnPhase !== 'TARGETING' && turnPhase !== 'HAND_SELECTION'} 
-                                    playable={turnPhase === 'HAND_SELECTION' ? (pendingCard?.id !== card.id) : player.energy >= card.cost}
-                                    noAnim={true} 
-                                />
-                            </div>
+                return (
+                    <div key={card.id} style={style} onMouseEnter={() => setHoveredCardId(card.id)} onMouseLeave={() => setHoveredCardId(null)} className="relative origin-bottom shrink-0">
+                        <div className="animate-card-deal" style={{ animationDelay: `${idx * 150}ms` }}>
+                            <CardComponent 
+                                card={card} 
+                                onClick={handleCardClick}
+                                disabled={turnPhase !== 'PLAYER' && turnPhase !== 'TARGETING' && turnPhase !== 'HAND_SELECTION'} 
+                                playable={turnPhase === 'HAND_SELECTION' ? (pendingCard?.id !== card.id) : player.energy >= card.cost}
+                                noAnim={true} 
+                            />
                         </div>
-                    );
-                })}
-            </div>
+                    </div>
+                );
+            })}
         </div>
       </div>
 
-      {/* LOG */}
-      <div className="hidden xl:flex w-72 h-full bg-slate-950/80 border-l border-slate-800 p-4 flex-col backdrop-blur-md relative z-10 shrink-0">
-          <div className="flex items-center gap-2 mb-4 text-amber-500 border-b border-slate-800 pb-2">
-              <ScrollText size={20} />
-              <h3 className="font-serif font-bold uppercase tracking-wider text-sm">Combat Log</h3>
+      {/* LOG - Desktop Only */}
+      <div className="hidden xl:flex w-80 h-full bg-slate-950/80 border-l border-slate-800 p-6 flex-col backdrop-blur-md relative z-10 shrink-0">
+          <div className="flex items-center gap-3 mb-4 text-amber-500 border-b border-slate-800 pb-3">
+              <ScrollText size={24} />
+              <h3 className="font-serif font-bold uppercase tracking-wider text-base">Combat Log</h3>
           </div>
-          <div ref={logContainerRef} className="flex-1 overflow-y-auto space-y-3 text-sm text-slate-400 pr-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+          <div ref={logContainerRef} className="flex-1 overflow-y-auto space-y-3 text-base text-slate-400 pr-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
               {combatLog.map((log, i) => (
-                  <div key={i} className="animate-fade-in border-l-2 border-slate-700 pl-2 py-1 leading-snug">{log}</div>
+                  <div key={i} className="animate-fade-in border-l-2 border-slate-700 pl-3 py-1 leading-snug">{log}</div>
               ))}
           </div>
       </div>

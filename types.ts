@@ -29,6 +29,7 @@ export interface Enemy {
   block: number; // Added block property
   intent: EnemyIntent;
   image: string;
+  phase?: number; // Track boss phases (e.g. 1 or 2)
 }
 
 export interface Player {

@@ -1,20 +1,52 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MathProblem } from '../utils/mathGenerator';
-import { Brain, X } from 'lucide-react';
+import { Brain, X, Check, AlertCircle } from 'lucide-react';
 
 interface MathModalProps {
   problem: MathProblem;
   cardName: string;
   onAnswer: (correct: boolean) => void;
   onClose: () => void;
+  tier?: number;
 }
 
-export const MathModal: React.FC<MathModalProps> = ({ problem, cardName, onAnswer, onClose }) => {
+export const MathModal: React.FC<MathModalProps> = ({ problem, cardName, onAnswer, onClose, tier = 1 }) => {
+  const [inputValue, setInputValue] = useState('');
+  const [shake, setShake] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isInputMode = tier >= 3;
+
+  useEffect(() => {
+    if (isInputMode && inputRef.current) {
+        inputRef.current.focus();
+    }
+  }, [isInputMode]);
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!inputValue.trim()) return;
+
+    // Normalizing string for comparison (removing spaces, case insensitive)
+    const normalizedInput = inputValue.trim().toLowerCase().replace(/\s/g, '');
+    const normalizedCorrect = problem.correctAnswer.toString().toLowerCase().replace(/\s/g, '');
+
+    if (normalizedInput === normalizedCorrect) {
+        onAnswer(true);
+    } else {
+        setShake(true);
+        setTimeout(() => {
+            onAnswer(false); // Fail immediately on wrong text input in Tier 3? Or give feedback?
+            // Current design: Fail immediately to keep tension high, or maybe 
+            // the onAnswer(false) in parent handles logic (exhausting/fizzling).
+        }, 500);
+    }
+  };
+
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
       <div 
-        className="bg-slate-800 border-2 border-amber-500 rounded-2xl p-4 md:p-8 max-w-sm md:max-w-md w-full shadow-2xl relative overflow-hidden mx-2"
+        className={`bg-slate-800 border-2 border-amber-500 rounded-2xl p-4 md:p-8 max-w-sm md:max-w-md w-full shadow-2xl relative overflow-hidden mx-2 ${shake ? 'animate-shake' : ''}`}
         style={{ backgroundColor: '#1e293b', borderColor: '#f59e0b' }} 
       >
         
@@ -45,22 +77,46 @@ export const MathModal: React.FC<MathModalProps> = ({ problem, cardName, onAnswe
             <p className="text-2xl md:text-3xl font-mono text-amber-100">{problem.question}</p>
         </div>
 
-        {/* Options */}
-        <div className="grid grid-cols-2 gap-3 md:gap-4">
-            {problem.options.map((option, idx) => (
-                <button
-                    key={idx}
-                    onClick={() => onAnswer(option === problem.correctAnswer)}
-                    className="bg-slate-700 hover:bg-slate-600 border border-slate-500 hover:border-amber-400 text-white py-3 md:py-4 rounded-lg text-lg md:text-xl font-bold transition-all active:scale-95 shadow-lg cursor-pointer"
-                    style={{ backgroundColor: '#334155', color: 'white', borderColor: '#64748b' }}
-                >
-                    {option}
-                </button>
-            ))}
-        </div>
+        {/* Input Mode (Tier 3+) vs Option Mode */}
+        {isInputMode ? (
+             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                 <div className="relative">
+                    <input
+                        ref={inputRef}
+                        type="text" 
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        placeholder="Type answer..."
+                        className="w-full bg-slate-950 border-2 border-slate-600 focus:border-amber-500 rounded-lg py-3 px-4 text-center text-xl text-white outline-none placeholder-slate-600 font-mono"
+                    />
+                    <div className="text-xs text-slate-500 mt-2 text-center flex items-center justify-center gap-1">
+                        <AlertCircle size={12} /> Press Enter to cast
+                    </div>
+                 </div>
+                 <button 
+                    type="submit"
+                    className="bg-amber-600 hover:bg-amber-500 text-white py-3 rounded-lg font-bold shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"
+                 >
+                    Cast Spell <Check size={18} />
+                 </button>
+             </form>
+        ) : (
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+                {problem.options.map((option, idx) => (
+                    <button
+                        key={idx}
+                        onClick={() => onAnswer(option === problem.correctAnswer)}
+                        className="bg-slate-700 hover:bg-slate-600 border border-slate-500 hover:border-amber-400 text-white py-3 md:py-4 rounded-lg text-lg md:text-xl font-bold transition-all active:scale-95 shadow-lg cursor-pointer"
+                        style={{ backgroundColor: '#334155', color: 'white', borderColor: '#64748b' }}
+                    >
+                        {option}
+                    </button>
+                ))}
+            </div>
+        )}
         
         <div className="mt-4 md:mt-6 text-center text-xs text-slate-500">
-            Solve correctly to cast the card!
+            {isInputMode ? "Tier 3: Precision required." : "Solve correctly to cast the card!"}
         </div>
       </div>
     </div>
