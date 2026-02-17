@@ -1,705 +1,962 @@
 
 import React, { useState, useEffect } from 'react';
-import { GameState, Card, MapNode, Enemy } from './types';
-import { CARDS, STARTING_DECK_IDS, ENEMIES, GENERATE_MAP, INITIAL_PLAYER_HP, INITIAL_MAX_ENERGY } from './constants';
-import { GameMap } from './components/GameMap';
-import { Combat } from './components/Combat';
-import { EventRoom } from './components/EventRoom';
-import { CardReward } from './components/CardReward';
-import { TierTransition } from './components/TierTransition';
-import { Play, RotateCw, Wrench, Lock, X, Bug, Trophy, Unlock, Skull, FastForward } from 'lucide-react';
-
-const createInitialDeck = (): Card[] => {
-    return STARTING_DECK_IDS.map(id => ({
-        ...CARDS[id],
-        id: id + Math.random().toString(36).substr(2, 9),
-        upgraded: false
-    }) as Card);
-};
+import { GameState, BrainrotItem, Bot } from './types';
+import { MathGame } from './components/MathGame';
+import { Shop } from './components/Shop';
+import { RivalsList } from './components/RivalsList';
+import { StatusHeader } from './components/StatusHeader';
+import { HelpModal } from './components/HelpModal';
+import { StealChallenge } from './components/StealChallenge';
+import { BaseDefense } from './components/BaseDefense';
+import { AdminPanel } from './components/AdminPanel';
+import { ResetConfirmModal } from './components/ResetConfirmModal';
+import { SHOP_ITEMS, getPassiveIncome, BASE_INVENTORY_SIZE, MAX_BOT_INVENTORY_SIZE, BOT_PROFILES, getRebirthCost, REBIRTH_MULTIPLIER_BONUS } from './constants';
+import { ShieldAlert, Play, Terminal } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
-    screen: 'MENU',
-    player: {
-        maxHp: INITIAL_PLAYER_HP,
-        currentHp: INITIAL_PLAYER_HP,
-        energy: INITIAL_MAX_ENERGY,
-        maxEnergy: INITIAL_MAX_ENERGY,
-        block: 0,
-        gold: 10,
-        deck: [],
-        discardPile: [],
-        drawPile: [],
-        hand: [],
-        relics: [],
-        poison: 0 // Initialize poison
-    },
-    currentEnemies: [],
-    floor: 1,
-    tier: 1, // Initialize Tier
-    map: [],
-    currentMapNodeId: null,
-    tutorialSeen: false,
-    poisonTutorialSeen: false,
-    lastRewardGold: 0
+  money: 0,
+  inventory: [],
+  streak: 0,
+  totalAnswered: 0,
+  multiplier: 1,
+  baseMoney: 0,
+  timerBonus: 0,
+  shieldActive: false,
+  godMode: false,
+  streakBonusMult: 1,
+  bots: [],
+  nextAttackTime: Date.now() + 60000, // Start with 60s grace period
+  consecutiveTimeouts: 0,
+  rebirths: 0
 };
 
-const App: React.FC = () => {
-    const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
+const SHOP_ROTATION_TIME = 10; // 10 seconds
+
+export default function App() {
+  const [gameState, setGameState] = useState<GameState>(() => {
+    const saved = localStorage.getItem('brainrot-math-save');
+    let state = saved ? JSON.parse(saved) : INITIAL_STATE;
     
-    // Fallback to sensible defaults (100vh) if window size reads 0 initially
-    const [windowSize, setWindowSize] = useState({ 
-        w: window.innerWidth || 800, 
-        h: window.innerHeight || 600 
-    });
+    // Check if bots need initialization or migration (old bot names or empty)
+    const oldBotNames = ["Calculus Chad", "Algebra Al", "Ms. Pythagorean", "Sir Isaac", "The Divider"];
+    const hasOldBots = state.bots && state.bots.some((b: Bot) => oldBotNames.includes(b.name));
+    const incorrectBotCount = state.bots && state.bots.length !== 5;
     
-    // Dev Mode State
-    const [isDevOpen, setIsDevOpen] = useState(false);
-    const [devPassword, setDevPassword] = useState('');
-    const [isDevAuth, setIsDevAuth] = useState(false);
-    const [devError, setDevError] = useState(false);
-    
-    // Cheat Toggles
-    const [devGodMode, setDevGodMode] = useState(false);
-    const [devOneHpMode, setDevOneHpMode] = useState(false);
-
-    // Reward Logic
-    const [pendingRewards, setPendingRewards] = useState(0);
-    const [rewardTutorialSeen, setRewardTutorialSeen] = useState(false);
-
-    // FIX: Handle device resize quirks
-    useEffect(() => {
-        const handleResize = () => {
-            // Ensure non-zero values
-            const w = window.innerWidth || document.documentElement.clientWidth || 800;
-            const h = window.innerHeight || document.documentElement.clientHeight || 600;
-            setWindowSize({ w, h });
-        };
+    // Initialize or migrate bots if missing or old or incorrect count
+    if (!state.bots || state.bots.length === 0 || hasOldBots || incorrectBotCount) {
+        // Randomly select 5 profiles
+        const shuffled = [...BOT_PROFILES].sort(() => 0.5 - Math.random());
+        const selectedProfiles = shuffled.slice(0, 5);
         
-        window.addEventListener('resize', handleResize);
+        state.bots = selectedProfiles.map((profile, index) => ({
+            id: `bot-${index}-${Date.now()}`,
+            name: profile.name,
+            avatar: profile.avatar,
+            inventory: [],
+            isVulnerable: false,
+            nextVulnerableTime: Date.now() + Math.random() * 30000,
+            vulnerableUntil: 0,
+            nextBuyTime: Date.now() + (Math.random() * 60000)
+        }));
         
-        // Force multiple checks to catch post-load resize (common in iframes)
-        const timeouts = [100, 500, 1000, 2000].map(t => setTimeout(handleResize, t));
-
-        // Initial check
-        handleResize();
-
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            timeouts.forEach(clearTimeout);
-        };
-    }, []);
-
-    const startGame = () => {
-        const deck = createInitialDeck();
-        setGameState({
-            ...INITIAL_STATE,
-            screen: 'MAP',
-            map: GENERATE_MAP(1),
-            player: {
-                ...INITIAL_STATE.player,
-                deck: deck,
-                drawPile: [...deck]
-            }
-        });
-        setRewardTutorialSeen(false);
-    };
-
-    const startTierTwoGame = () => {
-        const deck = createInitialDeck();
-        const tier = 2;
-        const map = GENERATE_MAP(tier);
-        
-        setGameState({
-            ...INITIAL_STATE,
-            screen: 'MAP',
-            tier: tier,
-            map: map,
-            player: {
-                ...INITIAL_STATE.player,
-                deck: deck,
-                drawPile: [...deck],
-                maxHp: INITIAL_PLAYER_HP + 10, // Buff for starting late
-                currentHp: INITIAL_PLAYER_HP + 10,
-                gold: 50 // Buff for starting late
-            },
-            tutorialSeen: true, // Skip Intro Tutorial
-            poisonTutorialSeen: false
-        });
-        setRewardTutorialSeen(false);
-        setIsDevOpen(false);
-    };
-
-    const startDevBattle = (enemyTemplate: Enemy, oneHp: boolean) => {
-        const deck = createInitialDeck();
-        const enemy = {
-            ...enemyTemplate,
-            id: `${enemyTemplate.id}-dev-${Date.now()}`,
-            currentHp: oneHp ? 1 : enemyTemplate.maxHp,
-            maxHp: oneHp ? 1 : enemyTemplate.maxHp
-        };
-
-        setGameState({
-            ...INITIAL_STATE,
-            screen: 'COMBAT',
-            currentEnemies: [enemy],
-            map: [], 
-            player: {
-                ...INITIAL_STATE.player,
-                deck: deck,
-                drawPile: [...deck]
-            },
-            tutorialSeen: true
-        });
-        setIsDevOpen(false);
-    };
-
-    const handleDevLogin = () => {
-        if (devPassword === 'sivart') {
-            setIsDevAuth(true);
-            setDevError(false);
-        } else {
-            setDevError(true);
-        }
-    };
-
-    const handleNodeSelect = (node: MapNode) => {
-        let nextScreen: GameState['screen'] = 'COMBAT';
-        let enemies: Enemy[] = [];
-        let isCombatNode = false;
-        
-        // Parse floor from ID (e.g. "1-1" -> 1)
-        const floor = parseInt(node.id.split('-')[0]);
-
-        if (node.type === 'combat') {
-            nextScreen = 'COMBAT';
-            isCombatNode = true;
-            
-            // Tier 1 scaling: Floor 2 (1-2), Floor 3+ (2-3)
-            // Tier 2 scaling: Harder.
-            let min = 1, max = 1;
-            
-            if (gameState.tier === 1) {
-                if (floor === 2) { max = 2; }
-                if (floor >= 3) { min = 2; max = 3; }
-            } else {
-                // Tier 2 is harder
-                min = 2; max = 3;
-            }
-
-            const count = Math.floor(Math.random() * (max - min + 1)) + min;
-            
-            // Enemy Pool: Include Poison enemies in Tier 2
-            let pool = [ENEMIES[0], ENEMIES[1]]; 
-            if (gameState.tier === 2) {
-                pool.push(ENEMIES[4]); // Venomous Variable
-            }
-            
+        // Give bots some starter items
+        state.bots.forEach((bot: Bot) => {
+            // Give 2-3 random items to start (so they don't start full)
+            const count = 2 + Math.floor(Math.random() * 2);
             for(let i=0; i<count; i++) {
-                const template = pool[Math.floor(Math.random() * pool.length)];
-                enemies.push({
-                    ...template,
-                    id: `${template.id}-${Date.now()}-${i}`,
-                    currentHp: devOneHpMode ? 1 : template.maxHp,
-                    maxHp: devOneHpMode ? 1 : template.maxHp
-                });
-            }
-
-        } else if (node.type === 'elite') {
-            nextScreen = 'COMBAT';
-            isCombatNode = true;
-             // SPECIAL ENCOUNTER: MATH MIMIC
-             // Formerly Elite, now a Unique but less punishing encounter
-             const template = ENEMIES[6]; // Math Mimic
-             
-             // Scale Mimic HP slightly for Tier 2
-             const maxHp = gameState.tier === 2 ? 40 : template.maxHp;
-             
-             enemies.push({
-                ...template,
-                id: `${template.id}-${Date.now()}`,
-                currentHp: devOneHpMode ? 1 : maxHp,
-                maxHp: devOneHpMode ? 1 : maxHp
-            });
-
-        } else if (node.type === 'boss') {
-            nextScreen = 'COMBAT';
-            isCombatNode = true;
-            
-            // SPAWN CORRECT BOSS BASED ON TIER
-            const template = gameState.tier === 2 ? ENEMIES[5] : ENEMIES[3]; // 5 is Predator, 3 is Poly-Gone
-            
-            enemies.push({
-                ...template,
-                id: `boss-${gameState.tier}`,
-                currentHp: devOneHpMode ? 1 : template.maxHp,
-                maxHp: devOneHpMode ? 1 : template.maxHp
-            });
-        } else if (node.type === 'event') {
-            nextScreen = 'EVENT';
-        } else if (node.type === 'rest') {
-            nextScreen = 'REWARD';
-        }
-
-        setGameState(prev => {
-            let updatedPlayer = { ...prev.player };
-            
-            if (isCombatNode) {
-                updatedPlayer.drawPile = [...updatedPlayer.deck].sort(() => Math.random() - 0.5);
-                updatedPlayer.discardPile = [];
-                updatedPlayer.hand = [];
-                updatedPlayer.block = 0;
-                updatedPlayer.energy = updatedPlayer.maxEnergy;
-                updatedPlayer.poison = 0; // Reset poison between fights
-            }
-
-            return {
-                ...prev,
-                screen: nextScreen,
-                currentEnemies: enemies,
-                currentMapNodeId: node.id,
-                map: prev.map.map(n => n.id === node.id ? { ...n, completed: true } : n),
-                player: updatedPlayer
-            };
-        });
-    };
-
-    const handleCombatVictory = (remainingHp: number) => {
-        const currentNode = gameState.map.find(n => n.id === gameState.currentMapNodeId);
-        const isElite = currentNode?.type === 'elite';
-        const isBoss = currentNode?.type === 'boss' || gameState.currentEnemies.some(e => e.id.includes('boss'));
-        
-        // Reward Logic
-        // Skip card reward if Tier 1 Boss (The Poly-Gone)
-        if (isBoss && gameState.tier === 1) {
-            setPendingRewards(0);
-        } else {
-            // UPDATED: Always reward 1 card, even for Elites (Math Mimics)
-            setPendingRewards(1);
-        }
-        
-        // Gold Logic
-        let goldReward = 10;
-        if (isElite) goldReward = 30; // Math Mimic gives 30 Gold base
-        if (isBoss) goldReward = 50;
-        
-        // Difficulty Multiplier
-        goldReward = goldReward * gameState.tier;
-
-        setGameState(prev => {
-            if (isBoss && prev.tier === 2) {
-                 // Final Victory if beating Boss 2 (Tier 2)
-                 return {
-                    ...prev,
-                    screen: 'VICTORY',
-                    currentEnemies: [],
-                    player: { 
-                        ...prev.player, 
-                        currentHp: remainingHp,
-                        gold: prev.player.gold + goldReward
-                    },
-                    lastRewardGold: goldReward
-                };
-            }
-
-            // Skip Reward Screen for Tier 1 Boss -> Go directly to Transition
-            if (isBoss && prev.tier === 1) {
-                return {
-                    ...prev,
-                    screen: 'TIER_TRANSITION',
-                    currentEnemies: [],
-                    player: { 
-                        ...prev.player, 
-                        // FULL HEAL FOR TIER 1 BOSS VICTORY
-                        currentHp: prev.player.maxHp, 
-                        gold: prev.player.gold + goldReward,
-                        poison: 0
-                    },
-                    lastRewardGold: goldReward
-                };
-            }
-
-            // Normal Reward Screen
-            return {
-                ...prev,
-                screen: 'REWARD',
-                currentEnemies: [],
-                player: { 
-                    ...prev.player, 
-                    currentHp: Math.min(prev.player.maxHp, remainingHp + (isBoss ? 10 : 0)), // Small heal after boss
-                    gold: prev.player.gold + goldReward,
-                    poison: 0
-                },
-                lastRewardGold: goldReward
-            };
-        });
-    };
-
-    const handleCombatDefeat = () => {
-        setGameState(prev => ({ ...prev, screen: 'GAME_OVER' }));
-    };
-
-    const handleTutorialComplete = () => {
-        if (!gameState.tutorialSeen) {
-            setGameState(prev => ({ ...prev, tutorialSeen: true }));
-        } else if (gameState.tier === 2 && !gameState.poisonTutorialSeen) {
-            setGameState(prev => ({ ...prev, poisonTutorialSeen: true }));
-        }
-    };
-
-    const handleEventComplete = (reward: boolean) => {
-        setGameState(prev => {
-            let newPlayer = { ...prev.player };
-            if (reward) {
-                newPlayer.maxHp += 10;
-                newPlayer.currentHp += 10;
-                newPlayer.gold += 50; // Bonus gold for riddle
-            }
-            return {
-                ...prev,
-                screen: 'MAP',
-                player: newPlayer
-            };
-        });
-    };
-
-    // Called when choosing a card to Add to deck
-    const handleCardRewardSelect = (card: Card) => {
-        const nextRewards = pendingRewards - 1;
-        setPendingRewards(nextRewards);
-
-        setGameState(prev => {
-            const newCard = { ...card, id: card.id + Math.random().toString(36).substr(2, 5) };
-            const newDeck = [...prev.player.deck, newCard];
-
-            // If rewards are done, go back to Map
-            if (nextRewards <= 0) {
-                 return {
-                     ...prev,
-                     screen: 'MAP',
-                     player: { ...prev.player, deck: newDeck }
-                 };
-            }
-
-            // Stay on REWARD screen if more rewards are pending
-            return {
-                ...prev,
-                screen: 'REWARD',
-                player: {
-                    ...prev.player,
-                    deck: newDeck,
-                }
-            };
-        });
-    };
-    
-    // Called from Rest Site
-    const handleRestOption = (action: 'heal' | 'upgrade' | 'leave', cardToUpgrade?: Card, cost: number = 0) => {
-        setGameState(prev => {
-            let newPlayer = { ...prev.player };
-            
-            if (action === 'heal') {
-                const healAmt = Math.floor(newPlayer.maxHp * 0.3); // Heal 30%
-                newPlayer.currentHp = Math.min(newPlayer.maxHp, newPlayer.currentHp + healAmt);
-            } else if (action === 'upgrade' && cardToUpgrade) {
-                // Deduct Gold
-                newPlayer.gold = Math.max(0, newPlayer.gold - cost);
+                let pool = SHOP_ITEMS.filter(item => item.price < 1000);
                 
-                // Upgrade Card in Deck
-                newPlayer.deck = newPlayer.deck.map(c => {
-                    if (c.id === cardToUpgrade.id) {
-                        return {
-                            ...c,
-                            upgraded: true,
-                            name: c.name + "+",
-                            value: c.value + 3, // Basic Upgrade Logic: +3 Potency
-                            description: c.description.replace(/\d+/, (match) => (parseInt(match) + 3).toString()) // Rudimentary desc update
-                        };
+                // Coaches only start with Commons
+                if (bot.name.includes("Coach")) {
+                    pool = pool.filter(item => item.rarity === 'common');
+                }
+                
+                if (pool.length > 0) {
+                    const item = pool[Math.floor(Math.random() * pool.length)];
+                    if(!bot.inventory.includes(item.id)) {
+                        bot.inventory.push(item.id);
                     }
-                    return c;
-                });
+                }
             }
-
-            return {
-                ...prev,
-                screen: 'MAP',
-                player: newPlayer
-            };
         });
-    };
+    } else {
+        // Migration for existing saves
+        state.bots = state.bots.map((bot: any) => ({
+            ...bot,
+            isVulnerable: bot.isVulnerable ?? false,
+            nextVulnerableTime: bot.nextVulnerableTime ?? (Date.now() + Math.random() * 30000),
+            vulnerableUntil: bot.vulnerableUntil ?? 0,
+            nextBuyTime: bot.nextBuyTime ?? (Date.now() + Math.random() * 60000),
+            // Enforce new limit on existing bots
+            inventory: bot.inventory.slice(0, MAX_BOT_INVENTORY_SIZE)
+        }));
+    }
+
+    // Migration for nextAttackTime
+    if (!state.nextAttackTime) {
+        state.nextAttackTime = Date.now() + 60000;
+    }
     
-    const handleStartTierTwo = () => {
-        const nextTier = 2;
-        // CRITICAL: Generate the map FIRST and store it in a variable to ensure it's not empty
-        const nextMapNodes = GENERATE_MAP(nextTier);
-        
-        console.log("Starting Tier 2 with Nodes:", nextMapNodes);
+    // Migration for consecutiveTimeouts
+    if (state.consecutiveTimeouts === undefined) {
+        state.consecutiveTimeouts = 0;
+    }
+
+    // Migration for rebirths
+    if (state.rebirths === undefined) {
+        state.rebirths = 0;
+    }
+    
+    // Migration for godMode
+    if (state.godMode === undefined) {
+        state.godMode = false;
+    }
+
+    return state;
+  });
+
+  const [showHelp, setShowHelp] = useState(true);
+  const [showResetConfirm, setShowResetConfirm] = useState(false); // New State for Confirmation
+  const [earnedAnimation, setEarnedAnimation] = useState<{value: number, id: number} | null>(null);
+  const [attackNotification, setAttackNotification] = useState<{message: string, success: boolean} | null>(null);
+  const [isGamePaused, setIsGamePaused] = useState(false);
+  const [lastPauseTime, setLastPauseTime] = useState<number | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  
+  // Steal State
+  const [activeSteal, setActiveSteal] = useState<{ 
+      bot: Bot; 
+      itemId: string; 
+      difficulty: number; 
+      timeLimit: number; 
+  } | null>(null);
+
+  // Base Defense State
+  const [activeAttack, setActiveAttack] = useState<{ expiresAt: number } | null>(null);
+  
+  // Shop Rotation State
+  const [shopRotation, setShopRotation] = useState<BrainrotItem[]>([]);
+  const [shopTimer, setShopTimer] = useState(SHOP_ROTATION_TIME);
+  
+  // Auto-save
+  useEffect(() => {
+    localStorage.setItem('brainrot-math-save', JSON.stringify(gameState));
+  }, [gameState]);
+
+  // Pause Toggle Logic
+  const togglePause = () => {
+    if (isGamePaused) {
+        // Resume
+        const now = Date.now();
+        const diff = lastPauseTime ? now - lastPauseTime : 0;
 
         setGameState(prev => ({
             ...prev,
-            tier: nextTier,
-            screen: 'MAP',
-            map: nextMapNodes,
-            currentMapNodeId: null,
-            currentEnemies: [],
-            floor: 1,
-            poisonTutorialSeen: false, // Ensure tutorial triggers
-            player: {
-                ...prev.player, // EXPLICITLY PRESERVE PLAYER STATS AND DECK
-                drawPile: [...prev.player.deck], // Reset deck for new run leg
-                discardPile: [],
-                hand: [],
-                energy: prev.player.maxEnergy,
-                block: 0,
-                poison: 0
-            },
-            lastRewardGold: 0
+            nextAttackTime: prev.nextAttackTime + diff,
+            bots: prev.bots.map(b => ({
+                ...b,
+                nextVulnerableTime: b.nextVulnerableTime + diff,
+                vulnerableUntil: b.vulnerableUntil > 0 ? b.vulnerableUntil + diff : 0,
+                nextBuyTime: b.nextBuyTime + diff
+            }))
         }));
-    };
 
-    const getCurrentNodeType = () => {
-        return gameState.map.find(n => n.id === gameState.currentMapNodeId)?.type || 'combat';
+        if (activeAttack) {
+            setActiveAttack(prev => prev ? ({ ...prev, expiresAt: prev.expiresAt + diff }) : null);
+        }
+
+        setIsGamePaused(false);
+        setLastPauseTime(null);
+    } else {
+        // Pause
+        setIsGamePaused(true);
+        setLastPauseTime(Date.now());
     }
+  };
 
-    const nodeType = getCurrentNodeType();
+  // Full Reset Logic Steps
+  // 1. Trigger Modal
+  const requestFullReset = () => {
+      setShowResetConfirm(true);
+      setShowAdminPanel(false); // Close admin panel if open
+  };
 
-    return (
-        <div 
-            className="fixed inset-0 bg-black text-white overflow-hidden" 
-            style={{ width: `${windowSize.w}px`, height: `${windowSize.h}px` }}
-        >
-            {/* Dev Mode Modal */}
-            {isDevOpen && (
-                <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in">
-                    <div className="bg-slate-800 border-2 border-slate-600 p-8 rounded-xl max-w-lg w-full relative shadow-2xl">
-                        <button onClick={() => setIsDevOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
-                            <X size={24} />
-                        </button>
-                        
-                        {!isDevAuth ? (
-                            <div className="flex flex-col gap-6">
-                                <h2 className="text-3xl font-serif text-amber-500 flex items-center gap-3">
-                                    <Lock size={32} /> Developer Access
-                                </h2>
-                                <p className="text-slate-400">Please authenticate to access debug tools.</p>
-                                <div className="space-y-2">
-                                    <input 
-                                        type="password" 
-                                        value={devPassword}
-                                        onChange={(e) => setDevPassword(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleDevLogin()}
-                                        placeholder="Enter Password"
-                                        className="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 p-4 rounded text-white outline-none transition-all"
-                                    />
-                                    {devError && <p className="text-red-500 text-sm">Incorrect password.</p>}
-                                </div>
-                                <button 
-                                    onClick={handleDevLogin}
-                                    className="w-full bg-amber-700 hover:bg-amber-600 text-white py-3 rounded font-bold shadow-lg transition-all"
-                                >
-                                    Login
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-4">
-                                <h2 className="text-2xl font-serif text-emerald-500 flex items-center gap-3 border-b border-slate-700 pb-4">
-                                    <Bug size={28} /> Debug Menu
-                                </h2>
+  // 2. Perform Reset
+  const executeFullReset = () => {
+      localStorage.removeItem('brainrot-math-save');
+      window.location.reload();
+  };
 
-                                {/* Cheats Section */}
-                                <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-700">
-                                    <div 
-                                        className={`flex items-center justify-between p-3 rounded cursor-pointer border transition-colors ${devGodMode ? 'bg-amber-500/20 border-amber-500' : 'bg-slate-700 border-slate-600'}`}
-                                        onClick={() => setDevGodMode(!devGodMode)}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <Unlock size={20} className={devGodMode ? "text-amber-400" : "text-slate-400"} />
-                                            <span className="font-bold">Unlock Map</span>
-                                        </div>
-                                        <div className={`w-4 h-4 rounded-full ${devGodMode ? 'bg-amber-500' : 'bg-slate-500'}`}></div>
-                                    </div>
+  // Admin Actions
+  const handleAdminAction = (action: string) => {
+      if (gameState.rebirths < 8) return;
 
-                                    <div 
-                                        className={`flex items-center justify-between p-3 rounded cursor-pointer border transition-colors ${devOneHpMode ? 'bg-red-500/20 border-red-500' : 'bg-slate-700 border-slate-600'}`}
-                                        onClick={() => setDevOneHpMode(!devOneHpMode)}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <Skull size={20} className={devOneHpMode ? "text-red-400" : "text-slate-400"} />
-                                            <span className="font-bold">1 HP Enemies</span>
-                                        </div>
-                                        <div className={`w-4 h-4 rounded-full ${devOneHpMode ? 'bg-red-500' : 'bg-slate-500'}`}></div>
-                                    </div>
-                                </div>
+      switch(action) {
+          case 'add_money_small':
+              setGameState(prev => ({ ...prev, money: prev.money + 1000000 }));
+              setAttackNotification({ message: "ADMIN: +1M CASH", success: true });
+              break;
+          case 'add_money_large':
+              setGameState(prev => ({ ...prev, money: prev.money + 100000000 }));
+              setAttackNotification({ message: "ADMIN: +100M CASH", success: true });
+              break;
+          case 'infinite_shield':
+              setGameState(prev => ({ ...prev, godMode: !prev.godMode }));
+              setAttackNotification({ message: `ADMIN: GOD MODE ${!gameState.godMode ? 'ENABLED' : 'DISABLED'}`, success: true });
+              break;
+          case 'trigger_attack':
+              setActiveAttack({ expiresAt: Date.now() + 14000 });
+              setShowAdminPanel(false);
+              break;
+          case 'clear_bots':
+               setGameState(prev => ({
+                   ...prev,
+                   bots: prev.bots.map(b => ({ ...b, inventory: [] }))
+               }));
+               setAttackNotification({ message: "ADMIN: BOTS RESET", success: true });
+              break;
+          case 'give_random_item':
+              const mythics = SHOP_ITEMS.filter(i => i.rarity === 'mythic');
+              const randomMythic = mythics[Math.floor(Math.random() * mythics.length)];
+              handleBuyItem({...randomMythic, price: 0}); // Free buy
+              setAttackNotification({ message: `ADMIN: GAVE ${randomMythic.name}`, success: true });
+              break;
+          case 'hard_reset':
+              requestFullReset();
+              break;
+      }
+      setTimeout(() => setAttackNotification(null), 2000);
+  };
 
-                                <button 
-                                    onClick={startTierTwoGame}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded font-bold shadow-lg transition-all flex items-center justify-center gap-2 mb-4 cursor-pointer"
-                                >
-                                    <FastForward size={20} /> Start Tier 2 Run
-                                </button>
-                                
-                                <p className="text-slate-400 text-sm">Quick Combat Test</p>
-                                
-                                <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
-                                    {ENEMIES.map(enemy => (
-                                        <div key={enemy.id} className="flex items-center justify-between bg-slate-700/50 p-4 rounded-lg border border-slate-600 hover:border-slate-500 transition-colors">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-slate-800 rounded p-1">
-                                                    <img src={enemy.image} className="w-full h-full object-contain" alt={enemy.name} />
-                                                </div>
-                                                <span className="font-bold text-slate-200">{enemy.name}</span>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button 
-                                                    onClick={() => startDevBattle(enemy, false)}
-                                                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-md"
-                                                >
-                                                    FIGHT
-                                                </button>
-                                                <button 
-                                                    onClick={() => startDevBattle(enemy, true)}
-                                                    className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-md border border-red-400"
-                                                >
-                                                    1 HP
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
+  // Helper to generate a new shop rotation
+  const generateNewShopRotation = () => {
+        // Separation by rarity
+        const commons = SHOP_ITEMS.filter(i => i.rarity === 'common');
+        const cheapCommons = commons.filter(i => i.price <= 100);
+        const starterPool = cheapCommons.length > 0 ? cheapCommons : commons;
+        const starterItem = starterPool[Math.floor(Math.random() * starterPool.length)];
+        const remainingCommons = commons.filter(i => i.id !== starterItem.id);
+        const shuffledRemaining = [...remainingCommons].sort(() => 0.5 - Math.random());
+        const otherCommons = shuffledRemaining.slice(0, 2);
+        const selectedCommons = [starterItem, ...otherCommons];
+        
+        const selectedRandoms: BrainrotItem[] = [];
+        const selectedIds = new Set(selectedCommons.map(i => i.id));
+        
+        for(let i=0; i<3; i++) {
+            const r = Math.random();
+            let targetRarity: string;
+            
+            if (r < 0.40) targetRarity = 'common';
+            else if (r < 0.70) targetRarity = 'rare';
+            else if (r < 0.90) targetRarity = 'epic';
+            else if (r < 0.99) targetRarity = 'legendary';
+            else targetRarity = 'mythic';
+            
+            const pool = SHOP_ITEMS.filter(item => item.rarity === targetRarity && !selectedIds.has(item.id));
+            const finalPool = pool.length > 0 ? pool : SHOP_ITEMS.filter(item => !selectedIds.has(item.id));
+            
+            if (finalPool.length > 0) {
+                const randomItem = finalPool[Math.floor(Math.random() * finalPool.length)];
+                selectedRandoms.push(randomItem);
+                selectedIds.add(randomItem.id);
+            }
+        }
 
-            {gameState.screen === 'MENU' && (
-                <div 
-                    className="flex flex-col items-center justify-center h-full bg-slate-900 relative"
-                    style={{ 
-                        backgroundImage: "url('https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=2070&auto=format&fit=crop')", 
-                        backgroundSize: 'cover', 
-                        backgroundPosition: 'center' 
-                    }}
-                >
-                    <div className="bg-black/60 p-10 rounded-2xl backdrop-blur-sm text-center border border-white/10 relative">
-                        <h1 
-                            className="text-6xl font-serif mb-2 font-bold drop-shadow-lg"
-                            style={{ 
-                                background: 'linear-gradient(to right, #fde68a, #f59e0b, #ef4444)', 
-                                WebkitBackgroundClip: 'text', 
-                                WebkitTextFillColor: 'transparent', 
-                                backgroundClip: 'text', 
-                                color: 'transparent' 
-                            }}
-                        >
-                            MATH SPIRE
-                        </h1>
-                        <p className="text-xl text-gray-300 mb-8 font-light">Climb the tower. Solve the equations.</p>
-                        <button 
-                            onClick={startGame}
-                            className="bg-red-700 hover:bg-red-600 text-white font-bold py-4 px-12 rounded-full shadow-[0_0_20px_rgba(185,28,28,0.5)] transition-all hover:scale-105 flex items-center gap-3 mx-auto text-xl cursor-pointer"
-                        >
-                            <Play fill="white" /> Start Journey
-                        </button>
-                    </div>
+        return [...selectedCommons, ...selectedRandoms];
+  };
 
-                    {/* Dev Mode Trigger Button */}
+  // Initial Shop Load
+  useEffect(() => {
+    if (shopRotation.length === 0) {
+        setShopRotation(generateNewShopRotation());
+    }
+  }, []);
+
+  // Shop Timer Logic
+  useEffect(() => {
+    const timer = setInterval(() => {
+        if (showHelp || activeSteal || activeAttack || isGamePaused || showAdminPanel || showResetConfirm) return;
+
+        setShopTimer((prev) => {
+            if (prev <= 1) {
+                setShopRotation(generateNewShopRotation());
+                return SHOP_ROTATION_TIME;
+            }
+            return prev - 1;
+        });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [showHelp, activeSteal, activeAttack, isGamePaused, showAdminPanel, showResetConfirm]);
+
+  // Passive Income Logic & Bot AI & Vulnerability Loop & Attack Loop
+  useEffect(() => {
+    const loop = setInterval(() => {
+        if (showHelp || activeSteal || isGamePaused || showAdminPanel || showResetConfirm) return; // Don't process if busy stealing or paused
+        
+        const now = Date.now();
+
+        // 0. Base Defense Check
+        // Only trigger if not already under attack, help closed, and not currently stealing
+        if (!activeAttack && now > gameState.nextAttackTime) {
+            setActiveAttack({ expiresAt: now + 14000 }); // 14 seconds
+        }
+
+        // Check for Attack Fail
+        if (activeAttack && now > activeAttack.expiresAt) {
+            handleAttackFail();
+        }
+
+        // 1. Player Passive Income
+        // Don't generate income while under attack
+        const totalPassive = gameState.inventory.reduce((sum, id) => {
+            const item = SHOP_ITEMS.find(i => i.id === id);
+            return sum + (item ? getPassiveIncome(item.price) : 0);
+        }, 0);
+
+        // 2. Bot Updates (Buying & Vulnerability)
+        const newBots = gameState.bots.map(bot => {
+            let updatedBot = { ...bot };
+
+            // Vulnerability Logic
+            if (updatedBot.isVulnerable) {
+                // Check if time is up
+                if (now > updatedBot.vulnerableUntil) {
+                    updatedBot.isVulnerable = false;
+                    // Cooldown between 30s and 60s
+                    updatedBot.nextVulnerableTime = now + (30000 + Math.random() * 30000);
+                }
+            } else {
+                // Check if ready to become vulnerable
+                if (now > updatedBot.nextVulnerableTime) {
+                    updatedBot.isVulnerable = true;
+                    
+                    // Default Duration: 5-10s (Max 10s)
+                    let duration = 5000 + Math.random() * 5000;
+                    
+                    // Mr. Gremillion: sleeps for 3-5s (Harder/Faster)
+                    if (updatedBot.name === "Mr. Gremillion") {
+                        duration = 3000 + Math.random() * 2000;
+                    }
+
+                    updatedBot.vulnerableUntil = now + duration;
+                }
+            }
+
+            // Buying Logic: Every 60 seconds (Fixed)
+            if (updatedBot.inventory.length < MAX_BOT_INVENTORY_SIZE && now > updatedBot.nextBuyTime) {
+                let pool = SHOP_ITEMS.filter(i => !updatedBot.inventory.includes(i.id));
+                
+                // Coaches ONLY buy common items
+                if (updatedBot.name.includes("Coach")) {
+                    pool = pool.filter(i => i.rarity === 'common');
+                }
+
+                if (pool.length > 0) {
+                    const randomItem = pool[Math.floor(Math.random() * pool.length)];
+                    updatedBot.inventory = [...updatedBot.inventory, randomItem.id];
+                }
+                
+                // Set next buy time to 60 seconds from now
+                updatedBot.nextBuyTime = now + 60000;
+            }
+            return updatedBot;
+        });
+
+        // Update State
+        setGameState(prev => ({
+            ...prev,
+            money: prev.money + totalPassive,
+            bots: newBots
+        }));
+
+    }, 1000);
+
+    return () => clearInterval(loop);
+  }, [gameState.inventory, showHelp, activeSteal, gameState.bots, activeAttack, gameState.nextAttackTime, isGamePaused, showAdminPanel, showResetConfirm]);
+
+  // Calculate stats including Rebirth Bonus
+  const calculateStats = (inventoryIds: string[], currentRebirths: number) => {
+    let multiplier = 1;
+    let baseMoney = 0;
+    let timerBonus = 0;
+    let streakBonusMult = 1;
+    let shieldActive = false;
+
+    inventoryIds.forEach(id => {
+        const item = SHOP_ITEMS.find(i => i.id === id);
+        if (!item) return;
+
+        switch (item.effectType) {
+            case 'multiplier': multiplier += item.value; break;
+            case 'base_money': baseMoney += item.value; break;
+            case 'timer': timerBonus += item.value; break;
+            case 'streak_bonus': streakBonusMult *= item.value; break;
+        }
+    });
+
+    // Add Rebirth Multiplier Bonus (Permanent +0.5x per rebirth)
+    multiplier += (currentRebirths * REBIRTH_MULTIPLIER_BONUS);
+
+    return { multiplier, baseMoney, timerBonus, streakBonusMult };
+  };
+
+  const handleStartGame = () => {
+    setShowHelp(false);
+    // Reset attack timer when starting game to ensure 60s grace period
+    setGameState(prev => ({
+        ...prev,
+        nextAttackTime: Date.now() + 60000
+    }));
+  };
+
+  const handleDefendBase = () => {
+      setActiveAttack(null);
+      // Reset timer to random between 60s and 90s
+      setGameState(prev => ({
+          ...prev,
+          nextAttackTime: Date.now() + 60000 + Math.random() * 30000
+      }));
+      setAttackNotification({ message: "BASE DEFENDED!", success: true });
+      setTimeout(() => setAttackNotification(null), 2000);
+  };
+
+  const handleAttackFail = () => {
+      // If God Mode is on, don't lose items!
+      if (gameState.godMode) {
+          setActiveAttack(null);
+          setGameState(prev => ({
+               ...prev,
+               nextAttackTime: Date.now() + 60000 + Math.random() * 30000
+          }));
+          setAttackNotification({ message: "BASE SHIELDED BY GOD MODE!", success: true });
+          setTimeout(() => setAttackNotification(null), 3000);
+          return;
+      }
+
+      setActiveAttack(null);
+      setGameState(prev => {
+          // Logic: Steal one random item from player and give to a random bot
+          let newInventory = [...prev.inventory];
+          let newBots = [...prev.bots];
+          let stolenItemName = null;
+          let thiefName = "Unknown";
+
+          if (newInventory.length > 0) {
+              const itemIdx = Math.floor(Math.random() * newInventory.length);
+              const itemId = newInventory[itemIdx];
+              const item = SHOP_ITEMS.find(i => i.id === itemId);
+              
+              if (item) {
+                  stolenItemName = item.name;
+                  newInventory.splice(itemIdx, 1);
+                  
+                  // Give to random bot if they have space
+                  const validBots = newBots.filter(b => b.inventory.length < MAX_BOT_INVENTORY_SIZE);
+                  if (validBots.length > 0) {
+                      const thiefIndex = Math.floor(Math.random() * validBots.length);
+                      const realBotIndex = newBots.findIndex(b => b.id === validBots[thiefIndex].id);
+                      if (realBotIndex > -1) {
+                          newBots[realBotIndex].inventory.push(itemId);
+                          thiefName = newBots[realBotIndex].name;
+                      }
+                  }
+              }
+          }
+
+          const stats = calculateStats(newInventory, prev.rebirths);
+          const hasShieldItem = newInventory.some(id => 
+            SHOP_ITEMS.find(i => i.id === id)?.effectType === 'shield'
+          );
+          
+          if (stolenItemName) {
+            setAttackNotification({ message: `${thiefName} STOLE YOUR ${stolenItemName}!`, success: false });
+          } else {
+             setAttackNotification({ message: "BASE BREACHED! (Nothing to steal)", success: false });
+          }
+          setTimeout(() => setAttackNotification(null), 4000);
+
+          return {
+              ...prev,
+              inventory: newInventory,
+              bots: newBots,
+              multiplier: stats.multiplier,
+              baseMoney: stats.baseMoney,
+              timerBonus: stats.timerBonus,
+              streakBonusMult: stats.streakBonusMult,
+              shieldActive: hasShieldItem ? prev.shieldActive : false,
+              nextAttackTime: Date.now() + 60000 + Math.random() * 30000 // Reset timer (60-90s)
+          };
+      });
+  };
+
+  const handleCorrectAnswer = (earnedAmount: number) => {
+    setGameState(prev => {
+        let newStreak = prev.streak + 1;
+        let newShieldActive = prev.shieldActive;
+        const hasShieldItem = prev.inventory.some(id => 
+            SHOP_ITEMS.find(i => i.id === id)?.effectType === 'shield'
+        );
+
+        if (hasShieldItem && !prev.shieldActive) {
+            newShieldActive = true; 
+        }
+
+        return {
+            ...prev,
+            money: prev.money + earnedAmount,
+            streak: newStreak,
+            totalAnswered: prev.totalAnswered + 1,
+            shieldActive: newShieldActive,
+            consecutiveTimeouts: 0 // Reset timeouts on correct answer
+        };
+    });
+
+    setEarnedAnimation({ value: earnedAmount, id: Date.now() });
+    setTimeout(() => setEarnedAnimation(null), 1000);
+  };
+
+  const handleWrongAnswer = () => {
+    setGameState(prev => {
+        if (prev.godMode) return prev; // GOD MODE PROTECTION
+
+        if (prev.shieldActive) {
+            return { ...prev, shieldActive: false };
+        } else {
+            return { ...prev, streak: 0 };
+        }
+    });
+  };
+
+  const handleTimeOut = () => {
+    setGameState(prev => {
+        if (prev.godMode) return prev; // GOD MODE PROTECTION
+
+        // Break Streak
+        let nextState = { ...prev };
+        if (prev.shieldActive) {
+            nextState.shieldActive = false;
+        } else {
+            nextState.streak = 0;
+        }
+
+        // Increment Timeouts
+        const newTimeouts = prev.consecutiveTimeouts + 1;
+        
+        // Check for 3 strikes
+        if (newTimeouts >= 3 && prev.inventory.length > 0) {
+            // Find most expensive item
+            const playerItems = prev.inventory.map(id => SHOP_ITEMS.find(i => i.id === id)).filter(Boolean) as BrainrotItem[];
+            playerItems.sort((a, b) => b.price - a.price); // Sort desc
+            
+            const itemToSteal = playerItems[0];
+            
+            if (itemToSteal) {
+                // Remove from player
+                nextState.inventory = prev.inventory.filter(id => id !== itemToSteal.id);
+                
+                // Give to random bot (if space)
+                const botIndex = Math.floor(Math.random() * nextState.bots.length);
+                const bot = nextState.bots[botIndex];
+                if (bot.inventory.length < MAX_BOT_INVENTORY_SIZE) {
+                    const newBots = [...nextState.bots];
+                    newBots[botIndex] = {
+                        ...bot,
+                        inventory: [...bot.inventory, itemToSteal.id]
+                    };
+                    nextState.bots = newBots;
+                }
+                
+                // Recalculate Stats
+                const stats = calculateStats(nextState.inventory, prev.rebirths);
+                nextState.multiplier = stats.multiplier;
+                nextState.baseMoney = stats.baseMoney;
+                nextState.timerBonus = stats.timerBonus;
+                nextState.streakBonusMult = stats.streakBonusMult;
+                // Re-check shield
+                const hasShieldItem = nextState.inventory.some(id => 
+                    SHOP_ITEMS.find(i => i.id === id)?.effectType === 'shield'
+                );
+                nextState.shieldActive = hasShieldItem ? nextState.shieldActive : false;
+
+                // Notify
+                setAttackNotification({ 
+                    message: `TOO SLOW! ${itemToSteal.name} STOLEN BY ${bot.name.toUpperCase()}!`, 
+                    success: false 
+                });
+                setTimeout(() => setAttackNotification(null), 4000);
+            }
+            
+            nextState.consecutiveTimeouts = 0;
+        } else {
+            nextState.consecutiveTimeouts = newTimeouts;
+        }
+
+        return nextState;
+    });
+  };
+
+  const handleBuyItem = (item: BrainrotItem) => {
+    const maxInventorySize = BASE_INVENTORY_SIZE + gameState.rebirths;
+
+    // Admin overwrite if needed (handled in calling function, here is standard buy)
+    // If price is 0, it's an admin gift
+    if (gameState.money < item.price) return;
+    if (gameState.inventory.length >= maxInventorySize && item.price > 0) return;
+    if (gameState.inventory.includes(item.id)) return;
+
+    setGameState(prev => {
+        // If it's an admin gift (price 0) and inventory is full, replace first item
+        let newInventory = [...prev.inventory];
+        if (item.price === 0 && newInventory.length >= maxInventorySize) {
+            newInventory.shift(); 
+        }
+        newInventory.push(item.id);
+
+        const stats = calculateStats(newInventory, prev.rebirths);
+        let newShieldActive = prev.shieldActive;
+        if (item.effectType === 'shield') newShieldActive = true;
+
+        return {
+            ...prev,
+            money: prev.money - item.price,
+            inventory: newInventory,
+            multiplier: stats.multiplier,
+            baseMoney: stats.baseMoney,
+            timerBonus: stats.timerBonus,
+            streakBonusMult: stats.streakBonusMult,
+            shieldActive: newShieldActive
+        };
+    });
+  };
+
+  const handleSellItem = (item: BrainrotItem) => {
+    setGameState(prev => {
+        const newInventory = prev.inventory.filter(id => id !== item.id);
+        const stats = calculateStats(newInventory, prev.rebirths);
+        const hasShieldItem = newInventory.some(id => 
+            SHOP_ITEMS.find(i => i.id === id)?.effectType === 'shield'
+        );
+        const newShieldActive = hasShieldItem ? prev.shieldActive : false;
+
+        return {
+            ...prev,
+            money: prev.money + item.price, 
+            inventory: newInventory,
+            multiplier: stats.multiplier,
+            baseMoney: stats.baseMoney,
+            timerBonus: stats.timerBonus,
+            streakBonusMult: stats.streakBonusMult,
+            shieldActive: newShieldActive
+        };
+    });
+  };
+
+  const handleRebirth = () => {
+      const nextRebirthCost = getRebirthCost(gameState.rebirths + 1);
+      
+      if (gameState.money < nextRebirthCost) return;
+
+      setGameState(prev => {
+          // Calculate new rebirth count
+          const newRebirthCount = prev.rebirths + 1;
+          
+          // Reset inventory and calculate new base stats (which will just be the rebirth bonus)
+          const newStats = calculateStats([], newRebirthCount);
+          
+          // Clear bots' inventories to reset the playing field
+          const resetBots = prev.bots.map(bot => ({
+              ...bot,
+              inventory: [],
+              isVulnerable: false,
+              nextVulnerableTime: Date.now() + Math.random() * 30000,
+          }));
+
+          setAttackNotification({ message: `REBIRTH ${newRebirthCount} ACHIEVED!`, success: true });
+          setTimeout(() => setAttackNotification(null), 3000);
+
+          return {
+              ...prev,
+              money: 0, // Lose money
+              inventory: [], // Lose brainrots
+              streak: 0,
+              multiplier: newStats.multiplier,
+              baseMoney: newStats.baseMoney,
+              timerBonus: newStats.timerBonus,
+              streakBonusMult: newStats.streakBonusMult,
+              shieldActive: false,
+              godMode: prev.godMode, // Preserve God Mode status
+              consecutiveTimeouts: 0,
+              bots: resetBots,
+              rebirths: newRebirthCount,
+              nextAttackTime: Date.now() + 60000 // 60s grace
+          };
+      });
+  };
+
+  const startSteal = (bot: Bot, itemId: string) => {
+      const item = SHOP_ITEMS.find(i => i.id === itemId);
+      if (!item) return;
+
+      let difficulty = 2000;
+      let timeLimit = 20; // STARTING at 20s for common
+
+      // Scaling based on rarity
+      switch (item.rarity) {
+          case 'common':
+              difficulty = 2000; 
+              timeLimit = 20;
+              break;
+          case 'rare':
+              difficulty = 4000; 
+              timeLimit = 18;
+              break;
+          case 'epic':
+              difficulty = 8000; 
+              timeLimit = 16;
+              break;
+          case 'legendary':
+              difficulty = 15000; 
+              timeLimit = 14;
+              break;
+          case 'mythic':
+              difficulty = 30000; 
+              timeLimit = 12;
+              break;
+      }
+
+      // MR GREMILLION MODIFIER: HARDER
+      if (bot.name === "Mr. Gremillion") {
+          difficulty += 5000; 
+          timeLimit = Math.max(5, timeLimit - 4); 
+      }
+
+      // COACH MODIFIER: EASIER
+      if (bot.name.includes("Coach")) {
+          difficulty = Math.max(1000, difficulty - 1500); 
+          timeLimit += 8; // Extra time
+      }
+
+      setActiveSteal({ bot, itemId, difficulty, timeLimit });
+  };
+
+  const finishSteal = (success: boolean) => {
+      if (!activeSteal) return;
+
+      const { bot, itemId } = activeSteal;
+      
+      setGameState(prev => {
+          let newBots = [...prev.bots];
+          let newInventory = [...prev.inventory];
+          let newMoney = prev.money;
+          
+          const targetBotIndex = newBots.findIndex(b => b.id === bot.id);
+          
+          if (success) {
+              // SUCCESS: Remove from bot, add to player
+              if (targetBotIndex > -1) {
+                  // Wake bot up immediately after being robbed
+                  newBots[targetBotIndex] = {
+                      ...newBots[targetBotIndex],
+                      isVulnerable: false,
+                      nextVulnerableTime: Date.now() + 30000,
+                      inventory: newBots[targetBotIndex].inventory.filter(id => id !== itemId)
+                  };
+              }
+              
+              const maxInventorySize = BASE_INVENTORY_SIZE + prev.rebirths;
+
+              // If player has space, give item. Else give cash value.
+              if (newInventory.length < maxInventorySize) {
+                  if (!newInventory.includes(itemId)) { // Ensure unique
+                      newInventory.push(itemId);
+                  } else {
+                      const item = SHOP_ITEMS.find(i => i.id === itemId);
+                      if (item) newMoney += item.price;
+                  }
+              } else {
+                   const item = SHOP_ITEMS.find(i => i.id === itemId);
+                   if (item) newMoney += item.price;
+              }
+          } else {
+              // FAIL: Remove random item from player, give to bot
+              // Wake bot up as they caught you
+              if (targetBotIndex > -1) {
+                  newBots[targetBotIndex] = {
+                      ...newBots[targetBotIndex],
+                      isVulnerable: false,
+                      nextVulnerableTime: Date.now() + 30000,
+                  };
+              }
+
+              // God Mode Protection for fails? Maybe, but let's keep risk for stealing active. 
+              // Actually, god mode usually prevents ALL negative effects.
+              if (!prev.godMode && prev.inventory.length > 0) {
+                  const randomIdx = Math.floor(Math.random() * prev.inventory.length);
+                  const lostItemId = prev.inventory[randomIdx];
+                  
+                  newInventory.splice(randomIdx, 1);
+                  
+                  if (targetBotIndex > -1) {
+                      if (newBots[targetBotIndex].inventory.length < MAX_BOT_INVENTORY_SIZE) {
+                          if (!newBots[targetBotIndex].inventory.includes(lostItemId)) {
+                             newBots[targetBotIndex].inventory.push(lostItemId);
+                          }
+                      }
+                  }
+              }
+          }
+
+          const stats = calculateStats(newInventory, prev.rebirths);
+          const hasShieldItem = newInventory.some(id => 
+            SHOP_ITEMS.find(i => i.id === id)?.effectType === 'shield'
+          );
+          const newShieldActive = hasShieldItem ? prev.shieldActive : false;
+          
+          return {
+              ...prev,
+              bots: newBots,
+              inventory: newInventory,
+              money: newMoney,
+              multiplier: stats.multiplier,
+              baseMoney: stats.baseMoney,
+              timerBonus: stats.timerBonus,
+              streakBonusMult: stats.streakBonusMult,
+              shieldActive: newShieldActive
+          };
+      });
+
+      setActiveSteal(null);
+  };
+
+  return (
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-900 font-sans relative">
+        {showHelp && <HelpModal onStart={handleStartGame} />}
+        
+        {/* New Reset Confirmation Modal */}
+        {showResetConfirm && (
+            <ResetConfirmModal 
+                onConfirm={executeFullReset} 
+                onCancel={() => setShowResetConfirm(false)} 
+            />
+        )}
+        
+        {/* Admin Button (Visible only at Rebirth 8+) */}
+        {gameState.rebirths >= 8 && !showHelp && (
+            <button 
+                onClick={() => setShowAdminPanel(true)}
+                className="fixed bottom-4 right-4 z-[90] bg-green-900/80 border-2 border-green-500 text-green-400 p-3 rounded-full shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:bg-green-800 transition-all btn-press"
+                title="Admin Panel"
+            >
+                <Terminal size={24} />
+            </button>
+        )}
+
+        {showAdminPanel && (
+            <AdminPanel 
+                onClose={() => setShowAdminPanel(false)} 
+                onAction={handleAdminAction}
+            />
+        )}
+        
+        {isGamePaused && !showHelp && !showAdminPanel && !showResetConfirm && (
+            <div 
+                className="fixed inset-0 z-[100] flex items-center justify-center"
+                style={{ 
+                    backgroundColor: 'rgba(15, 23, 42, 0.6)', 
+                    backdropFilter: 'blur(5px)',
+                    WebkitBackdropFilter: 'blur(5px)'
+                }}
+            >
+                <div className="bg-white rounded-2xl p-8 shadow-2xl text-center border-4 border-slate-200 animate-in zoom-in duration-200">
+                    <h2 className="text-3xl font-black text-slate-800 mb-2">PAUSED</h2>
+                    <p className="text-slate-500 font-bold mb-6">Take a breather!</p>
                     <button 
-                        onClick={() => setIsDevOpen(true)}
-                        className="absolute bottom-6 right-6 p-3 bg-black/40 text-slate-500 hover:text-white hover:bg-black/60 rounded-full transition-all backdrop-blur-sm border border-transparent hover:border-slate-500 cursor-pointer z-50"
-                        title="Dev Mode"
+                        onClick={togglePause}
+                        className="bg-slate-900 text-white font-bold text-xl px-8 py-3 rounded-xl hover:bg-slate-800 btn-press flex items-center gap-2 mx-auto transition-colors"
                     >
-                        <Wrench size={24} />
+                        <Play size={20} fill="currentColor" />
+                        Resume
                     </button>
                 </div>
-            )}
+            </div>
+        )}
 
-            {gameState.screen === 'MAP' && (
-                <>
-                    <GameMap 
-                        key={`map-tier-${gameState.tier}`}
-                        mapNodes={gameState.map} 
-                        currentNodeId={gameState.currentMapNodeId}
-                        onNodeSelect={handleNodeSelect}
-                        godMode={devGodMode}
+        {activeAttack && (
+            <BaseDefense 
+                expiresAt={activeAttack.expiresAt}
+                onDefend={handleDefendBase}
+                difficulty={Math.max(2000, gameState.money)} // Scale difficulty
+                isPaused={isGamePaused || showAdminPanel || showResetConfirm}
+            />
+        )}
+        
+        {attackNotification && (
+             <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-150 animate-bounce-short pointer-events-none">
+                <div className={`px-6 py-4 rounded-xl shadow-xl border-4 font-black text-xl uppercase flex items-center gap-3 ${attackNotification.success ? 'bg-green-500 border-green-700 text-white' : 'bg-red-600 border-red-800 text-white'}`}>
+                    {attackNotification.success ? <ShieldAlert size={24} /> : <ShieldAlert size={24} />}
+                    {attackNotification.message}
+                </div>
+             </div>
+        )}
+
+        {activeSteal && (
+            <StealChallenge 
+                targetItem={{ botName: activeSteal.bot.name, itemId: activeSteal.itemId }}
+                difficulty={activeSteal.difficulty}
+                initialTime={activeSteal.timeLimit}
+                onComplete={finishSteal}
+                isPaused={isGamePaused || showAdminPanel || showResetConfirm}
+            />
+        )}
+        
+        {/* Main Game Content - Blurred when paused */}
+        <div className={`flex flex-col w-full h-full transition-all duration-300 ${isGamePaused || showResetConfirm ? 'filter blur-[15px] opacity-25 pointer-events-none select-none' : ''}`}>
+            <StatusHeader 
+                gameState={gameState} 
+                isPaused={isGamePaused}
+                onTogglePause={togglePause}
+            />
+            
+            <div className="flex flex-1 flex-col md:flex-row overflow-hidden relative">
+                <aside className="w-full md:w-shop h-30pct md:h-full order-3 md:order-1 z-20 shadow-xl bg-white border-r border-slate-200">
+                    <Shop 
+                        gameState={gameState} 
+                        shopRotation={shopRotation}
+                        shopTimer={shopTimer}
+                        onBuyItem={handleBuyItem} 
+                        onSellItem={handleSellItem}
+                        onRebirth={handleRebirth}
                     />
-                    {/* Map Screen Dev Mode Trigger */}
-                    <button 
-                        onClick={() => setIsDevOpen(true)}
-                        className="absolute top-6 right-6 p-3 bg-black/40 text-slate-500 hover:text-white hover:bg-black/60 rounded-full transition-all backdrop-blur-sm border border-transparent hover:border-slate-500 z-50 cursor-pointer"
-                        title="Dev Mode"
-                    >
-                        <Wrench size={24} />
-                    </button>
-                </>
-            )}
+                </aside>
 
-            {gameState.screen === 'COMBAT' && (
-                <Combat 
-                    player={gameState.player}
-                    enemies={gameState.currentEnemies}
-                    onVictory={handleCombatVictory}
-                    onDefeat={handleCombatDefeat}
-                    showTutorial={!gameState.tutorialSeen || (gameState.tier === 2 && !gameState.poisonTutorialSeen)}
-                    tutorialType={!gameState.tutorialSeen ? 'intro' : 'poison'}
-                    onTutorialComplete={handleTutorialComplete}
-                    tier={gameState.tier}
-                />
-            )}
+                <main className="flex-1 relative order-1 md:order-2 h-40pct md:h-full overflow-hidden bg-gradient-to-br from-violet-600 to-indigo-600 shadow-[inset_0_0_20px_rgba(0,0,0,0.3)]">
+                    <MathGame 
+                        gameState={gameState} 
+                        isPaused={showHelp || !!activeSteal || !!activeAttack || isGamePaused || showAdminPanel || showResetConfirm}
+                        onCorrectAnswer={handleCorrectAnswer}
+                        onWrongAnswer={handleWrongAnswer}
+                        onTimeUp={handleTimeOut}
+                    />
 
-            {gameState.screen === 'EVENT' && (
-                <EventRoom onComplete={handleEventComplete} />
-            )}
+                    {earnedAnimation && (
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-full pointer-events-none z-50">
+                            <div className="animate-bounce text-4xl font-black text-green-500 stroke-black drop-shadow-lg">
+                                +${earnedAnimation.value}
+                            </div>
+                        </div>
+                    )}
+                </main>
 
-            {gameState.screen === 'REWARD' && (
-                <CardReward 
-                    key={pendingRewards} // Force re-mount to refresh cards when reward count changes
-                    onSelect={handleCardRewardSelect} 
-                    onRestOption={handleRestOption}
-                    type={nodeType === 'rest' ? 'rest' : 'combat'} 
-                    playerDeck={gameState.player.deck}
-                    playerGold={gameState.player.gold}
-                    earnedGold={gameState.lastRewardGold}
-                    showTutorial={!rewardTutorialSeen && nodeType !== 'rest'}
-                    onTutorialClose={() => setRewardTutorialSeen(true)}
-                />
-            )}
-
-            {gameState.screen === 'TIER_TRANSITION' && (
-                <TierTransition onContinue={handleStartTierTwo} />
-            )}
-
-            {gameState.screen === 'GAME_OVER' && (
-                <div className="flex flex-col items-center justify-center h-full bg-red-950/90 text-center">
-                    <h2 className="text-6xl font-serif text-red-500 mb-4">DEFEAT</h2>
-                    <p className="text-2xl text-red-200 mb-8">The numbers were too strong.</p>
-                    <button 
-                        onClick={() => setGameState(INITIAL_STATE)}
-                        className="bg-white text-red-900 font-bold py-3 px-8 rounded hover:bg-gray-200 flex items-center gap-2 cursor-pointer"
-                    >
-                       <RotateCw /> Try Again
-                    </button>
-                </div>
-            )}
-
-            {gameState.screen === 'VICTORY' && (
-                <div className="flex flex-col items-center justify-center h-full bg-slate-900 bg-[url('https://images.unsplash.com/photo-1533240332313-0dbdd3199061?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center text-center">
-                    <div className="bg-black/80 p-12 rounded-2xl backdrop-blur-md border-2 border-amber-500 shadow-[0_0_50px_rgba(245,158,11,0.5)] flex flex-col items-center">
-                        <Trophy size={80} className="text-yellow-400 mb-6 animate-bounce-slow" />
-                        <h2 className="text-6xl font-serif text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-amber-500 mb-6">VICTORY!</h2>
-                        <p className="text-2xl text-slate-200 mb-2">You have conquered Tier {gameState.tier}!</p>
-                        <p className="text-xl text-amber-200 mb-10 font-light italic">The Spire remains infinite...</p>
-                        
-                        <button 
-                            onClick={() => setGameState(INITIAL_STATE)}
-                            className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all hover:scale-105 flex items-center gap-3 mx-auto text-xl cursor-pointer"
-                        >
-                           <RotateCw /> Play Again
-                        </button>
-                    </div>
-                </div>
-            )}
+                <aside className="w-full md:w-sidebar h-30pct md:h-full order-2 md:order-3 z-20 shadow-xl bg-white border-l border-slate-200">
+                    <RivalsList 
+                        gameState={gameState}
+                        onStealAttempt={startSteal}
+                    />
+                </aside>
+            </div>
         </div>
-    );
-};
-
-export default App;
+    </div>
+  );
+}

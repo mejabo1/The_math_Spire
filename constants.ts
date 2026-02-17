@@ -1,441 +1,182 @@
 
-import { Card, Enemy, MapNode } from './types';
+import { BrainrotItem } from './types';
 
-export const INITIAL_PLAYER_HP = 20;
-export const INITIAL_MAX_ENERGY = 3;
-export const HAND_SIZE = 4;
+export const BASE_QUESTION_TIME = 30; // Changed to 30s
+export const BASE_MONEY_REWARD = 10;
+export const BASE_INVENTORY_SIZE = 8; // Renamed from MAX_INVENTORY_SIZE. Base slots.
+export const MAX_BOT_INVENTORY_SIZE = 4;
 
-// --- CARD LIBRARY ---
+// Rebirth Config
+export const BASE_REBIRTH_COST = 1000000;
+export const REBIRTH_MULTIPLIER_BONUS = 0.5; // +50% multiplier per rebirth
 
-export const CARDS: Record<string, Omit<Card, 'id'>> = {
-  strike: {
-    name: 'Integer Strike',
-    type: 'attack',
-    cost: 1,
-    value: 2,
-    description: 'Deal 2 damage.',
-    effectId: 'deal_damage',
-    rarity: 'common',
-    mathType: 'integer'
-  },
-  defend: {
-    name: 'Absolute Shield',
-    type: 'skill',
-    cost: 2,
-    value: 3,
-    description: 'Gain 3 Block.',
-    effectId: 'gain_block',
-    rarity: 'common',
-    mathType: 'addition'
-  },
-  subtraction: {
-    name: 'Quick Minus',
-    type: 'attack',
-    cost: 0,
-    value: 1,
-    description: 'Deal 1 damage.',
-    effectId: 'deal_damage',
-    rarity: 'common',
-    mathType: 'subtraction'
-  },
-  multiply_slam: {
-    name: 'Multiply Slam',
-    type: 'attack',
-    cost: 1,
-    value: 0,
-    description: 'Deal damage equal to your current Block.',
-    effectId: 'damage_equal_to_block',
-    rarity: 'rare',
-    mathType: 'multiplication'
-  },
-  divided_cleave: {
-    name: 'Divided Cleave',
-    type: 'attack',
-    cost: 3,
-    value: 3,
-    description: 'Deal 2 damage to ALL enemies.',
-    effectId: 'damage_all',
-    rarity: 'rare',
-    mathType: 'division'
-  },
-  // --- EXISTING REWARD CARDS ---
-  greater_exponentially: {
-    name: 'Greater Exponentially',
-    type: 'skill',
-    cost: 1,
-    value: 3,
-    description: 'Gain 3 Block. Upgrade a random card in hand.',
-    effectId: 'upgrade_hand',
-    rarity: 'rare',
-    mathType: 'exponent'
-  },
-  keep_change_change: {
-    name: 'Keep Change Change',
-    type: 'attack',
-    cost: 2,
-    value: 2,
-    description: 'Gain 1 Block. Deal 2 damage.',
-    effectId: 'block_damage',
-    rarity: 'common',
-    mathType: 'integer'
-  },
-  aggressive_multiplied: {
-    name: 'Aggressive Multiplied',
-    type: 'attack',
-    cost: 1,
-    value: 4,
-    description: 'Deal 4 damage. Discard a random card.',
-    effectId: 'damage_discard',
-    rarity: 'common',
-    mathType: 'multiplication'
-  },
-  pop_quiz: {
-    name: 'Pop Quiz',
-    type: 'skill',
-    cost: 1,
-    value: 2,
-    description: 'Gain 2 Energy. Exhausts if math answer is wrong.',
-    effectId: 'gain_energy',
-    rarity: 'common'
-  },
-  factor_defense: {
-    name: 'Factor Defense',
-    type: 'skill',
-    cost: 1,
-    value: 0,
-    description: 'Gain Block equal to cards in hand.',
-    effectId: 'block_hand_size',
-    rarity: 'rare',
-    mathType: 'factorization'
-  },
-  order_of_ops: {
-    name: 'Order of Ops',
-    type: 'attack',
-    cost: 1,
-    value: 3,
-    description: 'Deal 3 damage. Incorrect answer reduces Block by 2.',
-    effectId: 'deal_damage', 
-    rarity: 'common',
-    mathType: 'pemdas'
-  },
-  chain_calculation: {
-    name: 'Chain Calculation',
-    type: 'attack',
-    cost: 3,
-    value: 3,
-    description: 'Deal 2 damage 2 times.',
-    effectId: 'multi_hit_2', 
-    rarity: 'rare',
-    mathType: 'arithmetic'
-  },
-  divided_fraction_split: {
-    name: 'Divided Fraction Split',
-    type: 'attack',
-    cost: 2,
-    value: 2,
-    description: 'Deal 2 damage to ALL enemies.',
-    effectId: 'damage_all',
-    rarity: 'rare',
-    mathType: 'division' 
-  },
-  variable_strike: {
-    name: 'Variable Strike',
-    type: 'attack',
-    cost: 3,
-    value: 0,
-    description: 'Deal damage equal to cards in hand. Draw 1 card.',
-    effectId: 'damage_x_draw',
-    rarity: 'epic',
-    mathType: 'algebra'
-  },
-  absolute_value: {
-    name: 'Absolute Value',
-    type: 'power', 
-    cost: 1,
-    value: 2,
-    description: 'Gain 2 Strength (Damage) for this combat.',
-    effectId: 'buff_damage',
-    rarity: 'rare',
-    mathType: 'absolute_value'
-  },
-  balance_equation: {
-    name: 'Balance Equation',
-    type: 'skill',
-    cost: 1,
-    value: 0,
-    description: 'Gain Block equal to the target enemy\'s HP.',
-    effectId: 'block_enemy',
-    rarity: 'epic',
-    mathType: 'algebra'
-  },
-  reckless_attack: {
-    name: 'Reckless Attack',
-    type: 'attack',
-    cost: 1,
-    value: 5,
-    description: 'Deal 5 damage. Lose 1 HP.',
-    effectId: 'reckless_attack',
-    rarity: 'common',
-    mathType: 'prime_factors'
-  },
-
-  // --- NEW REQUESTED CARDS ---
-  clean_eraser: {
-    name: 'Clean Eraser',
-    type: 'skill',
-    cost: 1,
-    value: 0,
-    description: 'Exhaust 1 card from hand. Draw 1 card.',
-    effectId: 'exhaust_1_draw_1',
-    rarity: 'common',
-    mathType: 'subtraction_3digit'
-  },
-  show_your_work: {
-    name: 'Show Your Work',
-    type: 'skill',
-    cost: 1,
-    value: 0,
-    description: 'Exhaust 1 card from hand. Draw 2 cards.',
-    effectId: 'exhaust_1_draw_2',
-    rarity: 'common',
-    mathType: 'decimal_addition'
-  },
-  mistake_detector: {
-    name: 'Mistake Detector',
-    type: 'attack',
-    cost: 1,
-    value: 0,
-    description: 'Exhaust 1 card from hand. Deal damage equal to its cost.',
-    effectId: 'damage_exhaust',
-    rarity: 'rare',
-    mathType: 'decimal_multiplication'
-  },
-  simplify: {
-    name: 'Simplify',
-    type: 'skill',
-    cost: 1,
-    value: 0,
-    description: 'Reduce the cost of a card in hand by 1.',
-    effectId: 'reduce_cost',
-    rarity: 'rare',
-    mathType: 'fraction_simplification'
-  },
-  loose_notes_chaos: {
-    name: 'Loose Notes Chaos',
-    type: 'skill',
-    cost: 3,
-    value: 0,
-    description: 'Shuffle your hand. Reduce cost of ALL cards in hand by 1.',
-    effectId: 'chaos_hand',
-    rarity: 'epic',
-    mathType: 'decimal_division'
-  },
-  decimal_salve: {
-    name: 'Decimal Salve',
-    type: 'skill',
-    cost: 2,
-    value: 3,
-    description: 'Heal 3 HP.',
-    effectId: 'heal_player',
-    rarity: 'rare',
-    mathType: 'decimal_addition'
-  },
-  integer_fortress: {
-    name: 'Wordy Shield',
-    type: 'skill',
-    cost: 3,
-    value: 7,
-    description: 'Gain 7 Block.',
-    effectId: 'gain_block',
-    rarity: 'common',
-    mathType: 'integer_word_problem'
-  }
-};
-
-export const REWARD_POOL_IDS = [
-  'greater_exponentially',
-  'keep_change_change',
-  'aggressive_multiplied',
-  'pop_quiz',
-  'factor_defense',
-  'order_of_ops',
-  'chain_calculation',
-  'divided_fraction_split',
-  'variable_strike',
-  'absolute_value',
-  'balance_equation',
-  'reckless_attack',
-  'clean_eraser',
-  'show_your_work',
-  'mistake_detector',
-  'simplify',
-  'loose_notes_chaos',
-  'decimal_salve',
-  'integer_fortress'
+// Specific costs for Rebirth levels 1-8
+// Rebirth 8 is the Admin Panel unlock at 80M
+const REBIRTH_COST_TIERS = [
+    1000000,   // Level 1
+    5000000,   // Level 2
+    10000000,  // Level 3
+    25000000,  // Level 4
+    40000000,  // Level 5
+    60000000,  // Level 6
+    70000000,  // Level 7
+    80000000   // Level 8 (Admin Panel)
 ];
 
-export const STARTING_DECK_IDS = [
-  'strike', 'strike', 'strike', 
-  'defend', 'defend', 'defend', 'defend',
-  'subtraction',
-  'multiply_slam',
-  'divided_cleave'
-];
-
-// --- PLAYER SPRITE ---
-export const PLAYER_SPRITE = `data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M60 140 Q60 180 140 180 Q140 140 140 140 L130 90 L70 90 Z" fill="%233b82f6" stroke="%231e3a8a" stroke-width="3"/><path d="M70 90 L50 130" stroke="%231e3a8a" stroke-width="3" fill="none"/><path d="M130 90 L150 130" stroke="%231e3a8a" stroke-width="3" fill="none"/><path d="M75 90 L75 140" stroke="%231f2937" stroke-width="4"/><path d="M125 90 L125 140" stroke="%231f2937" stroke-width="4"/><circle cx="100" cy="70" r="35" fill="%23fca5a5" stroke="%237f1d1d" stroke-width="3"/><circle cx="90" cy="70" r="8" fill="%23e0f2fe" stroke="black" stroke-width="2"/><circle cx="110" cy="70" r="8" fill="%23e0f2fe" stroke="black" stroke-width="2"/><line x1="98" y1="70" x2="102" y2="70" stroke="black" stroke-width="2"/><path d="M65 70 Q70 30 100 30 Q130 30 135 70" fill="%234b5563" stroke="black" stroke-width="2"/><rect x="140" y="40" width="15" height="120" fill="%23facc15" stroke="%23854d0e" stroke-width="2" transform="rotate(15 140 100)"/><polygon points="135,35 155,35 145,15" fill="%23fbcfe8" stroke="%23be185d" stroke-width="2" transform="rotate(15 140 100)"/><polygon points="140,160 155,160 147.5,180" fill="%23fcd34d" stroke="%23854d0e" stroke-width="2" transform="rotate(15 140 100)"/><polygon points="144,175 151,175 147.5,180" fill="black" transform="rotate(15 140 100)"/></svg>`;
-
-// --- ENEMY SPRITES (SVG Data URIs) ---
-
-const SVG_TRIANGLE = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 10 L90 90 L10 90 Z" fill="%23ef4444" stroke="%237f1d1d" stroke-width="3"/><circle cx="40" cy="50" r="5" fill="white"/><circle cx="60" cy="50" r="5" fill="white"/><path d="M40 70 Q50 60 60 70" stroke="black" stroke-width="3" fill="none"/></svg>`;
-
-const SVG_ALGEBRA_IMP = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="20" width="60" height="60" rx="10" fill="%238b5cf6" stroke="%234c1d95" stroke-width="3"/><text x="50" y="65" font-family="monospace" font-size="40" fill="white" text-anchor="middle" font-weight="bold">x</text><path d="M30 30 L40 40 M70 30 L60 40" stroke="black" stroke-width="3"/></svg>`;
-
-const SVG_FRACTION_PHANTOM = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40" fill="%233b82f6" opacity="0.8"/><line x1="20" y1="50" x2="80" y2="50" stroke="white" stroke-width="4"/><circle cx="35" cy="35" r="4" fill="white"/><circle cx="65" cy="35" r="4" fill="white"/><path d="M40 70 Q50 60 60 70" stroke="white" stroke-width="2" fill="none"/></svg>`;
-
-const SVG_VENOMOUS_VARIABLE = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M30 20 Q50 5 70 20 Q85 40 70 70 Q50 95 30 70 Q15 40 30 20 Z" fill="%2310b981" stroke="%23064e3b" stroke-width="3"/><path d="M40 35 L45 45 L50 35 L55 45 L60 35" stroke="%23064e3b" stroke-width="2" fill="none"/><circle cx="35" cy="50" r="3" fill="%23064e3b"/><circle cx="65" cy="50" r="3" fill="%23064e3b"/><path d="M40 70 Q50 65 60 70" stroke="%23064e3b" stroke-width="2" fill="none"/><path d="M20 50 Q10 40 20 30" stroke="%2310b981" stroke-width="4" fill="none" opacity="0.6"/><path d="M80 50 Q90 60 80 70" stroke="%2310b981" stroke-width="4" fill="none" opacity="0.6"/></svg>`;
-
-const SVG_BOSS_POLYGONE = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><polygon points="50 5, 95 27, 95 72, 50 95, 5 72, 5 27" fill="%231e293b" stroke="%23fbbf24" stroke-width="4"/><circle cx="35" cy="40" r="6" fill="%23ef4444" className="animate-pulse"/><circle cx="65" cy="40" r="6" fill="%23ef4444" className="animate-pulse"/><path d="M30 70 Q50 85 70 70" stroke="%23fbbf24" stroke-width="3" fill="none"/></svg>`;
-
-// Tier 2 Boss: The Prime Predator (Wolf/Beast theme with numbers)
-const SVG_BOSS_PREDATOR = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%237f1d1d"/><stop offset="100%" stop-color="%23000"/></linearGradient></defs><path d="M20 30 Q10 10 30 15 Q40 5 50 20 Q60 5 70 15 Q90 10 80 30 Q95 50 80 70 Q90 90 50 95 Q10 90 20 70 Q5 50 20 30 Z" fill="url(%23g)" stroke="%23dc2626" stroke-width="3"/><path d="M30 40 L40 45 L35 55 Z" fill="%23ef4444"/><path d="M70 40 L60 45 L65 55 Z" fill="%23ef4444"/><path d="M40 70 L50 80 L60 70" stroke="%23ef4444" stroke-width="2" fill="none"/><path d="M25 60 L35 75 L45 60" fill="white"/><path d="M75 60 L65 75 L55 60" fill="white"/><circle cx="35" cy="45" r="2" fill="white"/><circle cx="65" cy="45" r="2" fill="white"/></svg>`;
-
-// Unique Enemy: Math Mimic (Replaces Elites)
-const SVG_MATH_MIMIC = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="35" width="60" height="45" rx="5" fill="%23a855f7" stroke="%236b21a8" stroke-width="3"/><path d="M20 35 L80 35 L70 15 L30 15 Z" fill="%239333ea" stroke="%236b21a8" stroke-width="3"/><path d="M20 35 L80 35" stroke="%23000" stroke-width="2"/><path d="M35 45 L40 55 L45 45 L50 55 L55 45 L60 55 L65 45" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40" cy="25" r="3" fill="yellow" className="animate-pulse"/><circle cx="60" cy="25" r="3" fill="yellow" className="animate-pulse"/><text x="50" y="70" font-family="monospace" font-size="12" fill="white" text-anchor="middle">?</text></svg>`;
-
-// --- ENEMIES ---
-
-export const ENEMIES: Enemy[] = [
-  {
-    id: 'basic_shape',
-    name: 'Angry Triangle',
-    maxHp: 7,
-    currentHp: 7,
-    block: 0,
-    intent: { type: 'attack', value: 2 },
-    image: SVG_TRIANGLE
-  },
-  {
-    id: 'algebra_imp',
-    name: 'Algebra Imp',
-    maxHp: 3, 
-    currentHp: 3,
-    block: 0,
-    intent: { type: 'defend', value: 2 },
-    image: SVG_ALGEBRA_IMP
-  },
-  {
-    id: 'fraction_phantom',
-    name: 'Fraction Phantom',
-    maxHp: 14,
-    currentHp: 14,
-    block: 0,
-    intent: { type: 'attack', value: 4 },
-    image: SVG_FRACTION_PHANTOM
-  },
-  {
-    id: 'boss_geometry',
-    name: 'The Poly-Gone',
-    maxHp: 35,
-    currentHp: 35,
-    block: 0,
-    intent: { type: 'attack', value: 4 },
-    image: SVG_BOSS_POLYGONE
-  },
-  // TIER 2 ENEMY
-  {
-    id: 'venomous_variable',
-    name: 'Venomous Variable',
-    maxHp: 15, // NERFED from 25
-    currentHp: 15, // NERFED from 25
-    block: 0,
-    intent: { type: 'poison', value: 2 },
-    image: SVG_VENOMOUS_VARIABLE
-  },
-  // TIER 2 BOSS
-  {
-    id: 'boss_predator',
-    name: 'The Fraction Freak',
-    maxHp: 65,
-    currentHp: 65,
-    block: 0,
-    intent: { type: 'drain', value: 6 }, // Unique mechanic: Life Steal
-    image: SVG_BOSS_PREDATOR
-  },
-  // UNIQUE ENEMY (Replaces Elite)
-  {
-    id: 'math_mimic',
-    name: 'Math Mimic',
-    maxHp: 12,
-    currentHp: 12,
-    block: 0,
-    intent: { type: 'attack', value: 3 },
-    image: SVG_MATH_MIMIC
-  }
-];
-
-// --- MAP GENERATION HELPERS ---
-
-export const GENERATE_MAP = (tier: number = 1): MapNode[] => {
-    // Explicitly handle Tier 2
-    if (Number(tier) === 2) {
-        const t2Nodes: MapNode[] = [];
-        // Floor 1: Wider Start (Shifted UP from y=82 to y=75)
-        t2Nodes.push({ id: '1-1', type: 'combat', x: 20, y: 75, next: ['2-1', '2-2'], completed: false });
-        t2Nodes.push({ id: '1-2', type: 'combat', x: 40, y: 75, next: ['2-2', '2-3'], completed: false });
-        t2Nodes.push({ id: '1-3', type: 'combat', x: 60, y: 75, next: ['2-3', '2-4'], completed: false });
-        t2Nodes.push({ id: '1-4', type: 'combat', x: 80, y: 75, next: ['2-4', '2-5'], completed: false });
-
-        // Floor 2: Chaos Layer (Shifted UP from y=66 to y=60)
-        t2Nodes.push({ id: '2-1', type: 'combat', x: 15, y: 60, next: ['3-1'], completed: false });
-        t2Nodes.push({ id: '2-2', type: 'event', x: 35, y: 60, next: ['3-1', '3-2'], completed: false });
-        t2Nodes.push({ id: '2-3', type: 'combat', x: 55, y: 60, next: ['3-2', '3-3'], completed: false });
-        t2Nodes.push({ id: '2-4', type: 'event', x: 75, y: 60, next: ['3-3', '3-4'], completed: false });
-        t2Nodes.push({ id: '2-5', type: 'combat', x: 90, y: 60, next: ['3-4'], completed: false });
-
-        // Floor 3: Elite Gauntlet (Shifted UP from y=50 to y=45)
-        t2Nodes.push({ id: '3-1', type: 'elite', x: 25, y: 45, next: ['4-1', '4-2'], completed: false });
-        t2Nodes.push({ id: '3-2', type: 'rest', x: 45, y: 45, next: ['4-2'], completed: false });
-        t2Nodes.push({ id: '3-3', type: 'elite', x: 65, y: 45, next: ['4-3'], completed: false });
-        t2Nodes.push({ id: '3-4', type: 'rest', x: 85, y: 45, next: ['4-3'], completed: false });
-
-        // Floor 4: Pre-Boss (Shifted UP from y=34 to y=30)
-        t2Nodes.push({ id: '4-1', type: 'event', x: 30, y: 30, next: ['5-1'], completed: false });
-        t2Nodes.push({ id: '4-2', type: 'combat', x: 50, y: 30, next: ['5-1'], completed: false });
-        t2Nodes.push({ id: '4-3', type: 'rest', x: 70, y: 30, next: ['5-1'], completed: false });
-
-        // Floor 5: Boss 2
-        t2Nodes.push({ id: '5-1', type: 'boss', x: 50, y: 15, next: [], completed: false });
-        
-        return t2Nodes;
-    }
-
-    // Default Tier 1 Map (Fallback)
-    const t1Nodes: MapNode[] = [];
+export const getRebirthCost = (targetLevel: number): number => {
+    if (targetLevel <= 0) return 0;
     
-    // Floor 1: The Entrance (Combat)
-    t1Nodes.push({ id: '1-1', type: 'combat', x: 25, y: 80, next: ['2-1', '2-2'], completed: false });
-    t1Nodes.push({ id: '1-2', type: 'combat', x: 50, y: 80, next: ['2-2', '2-3'], completed: false });
-    t1Nodes.push({ id: '1-3', type: 'combat', x: 75, y: 80, next: ['2-3', '2-4'], completed: false });
-
-    // Floor 2: The Fork (Combat/Event)
-    t1Nodes.push({ id: '2-1', type: 'combat', x: 20, y: 65, next: ['3-1', '3-2'], completed: false });
-    t1Nodes.push({ id: '2-2', type: 'event', x: 40, y: 65, next: ['3-2'], completed: false });
-    t1Nodes.push({ id: '2-3', type: 'combat', x: 60, y: 65, next: ['3-2', '3-3'], completed: false });
-    t1Nodes.push({ id: '2-4', type: 'event', x: 80, y: 65, next: ['3-3'], completed: false });
-
-    // Floor 3: The Midpoint (Elite/Rest)
-    t1Nodes.push({ id: '3-1', type: 'elite', x: 30, y: 50, next: ['4-1', '4-2'], completed: false });
-    t1Nodes.push({ id: '3-2', type: 'rest', x: 50, y: 50, next: ['4-2'], completed: false });
-    t1Nodes.push({ id: '3-3', type: 'elite', x: 70, y: 50, next: ['4-2', '4-3'], completed: false });
-
-    // Floor 4: The Ascent (Prep)
-    t1Nodes.push({ id: '4-1', type: 'event', x: 30, y: 35, next: ['5-1'], completed: false });
-    t1Nodes.push({ id: '4-2', type: 'combat', x: 50, y: 35, next: ['5-1'], completed: false });
-    t1Nodes.push({ id: '4-3', type: 'rest', x: 70, y: 35, next: ['5-1'], completed: false });
-
-    // Floor 5: The Boss
-    t1Nodes.push({ id: '5-1', type: 'boss', x: 50, y: 15, next: [], completed: false });
-
-    return t1Nodes;
+    // Use defined tiers if available
+    if (targetLevel <= REBIRTH_COST_TIERS.length) {
+        return REBIRTH_COST_TIERS[targetLevel - 1];
+    }
+    
+    // Fallback scaling for levels > 8 (Add 50M per level)
+    const lastDefinedCost = REBIRTH_COST_TIERS[REBIRTH_COST_TIERS.length - 1];
+    const extraLevels = targetLevel - REBIRTH_COST_TIERS.length;
+    return lastDefinedCost + (extraLevels * 50000000);
 };
+
+// Helper to calculate passive income based on price (1% of price per second, min 1)
+export const getPassiveIncome = (price: number): number => {
+    return Math.max(1, Math.floor(price * 0.01));
+};
+
+export const BOT_PROFILES = [
+    { name: "Mrs. Garner", avatar: "👩‍🏫" },
+    { name: "Mrs. Sykes", avatar: "👩‍💼" },
+    { name: "Mr. Gremillion", avatar: "👨‍🏫" },
+    { name: "Mrs. Huynh", avatar: "👩‍🔬" },
+    { name: "Mrs. Young", avatar: "👩‍🎨" },
+    { name: "Mrs. Blackwell", avatar: "📓" },
+    { name: "Mrs. Craig", avatar: "🍎" },
+    { name: "Mrs. Morgan", avatar: "💻" },
+    { name: "Coach Copley", avatar: "🧢" },
+    { name: "Coach Redwine", avatar: "👟" },
+    { name: "Jimmy", avatar: "🤪" },
+    // New Rivals
+    { name: "Israel", avatar: "😎" },
+    { name: "Harper", avatar: "🎀" },
+    { name: "Luke F.", avatar: "🧢" },
+    { name: "Lawson", avatar: "🦁" },
+    { name: "Luke M.", avatar: "🎸" },
+    { name: "Vina", avatar: "🌺" },
+    { name: "Hope", avatar: "✨" },
+    { name: "Ellie", avatar: "🎨" },
+    { name: "Dominic", avatar: "🎮" },
+    { name: "Joseph", avatar: "🏀" },
+    { name: "Madi", avatar: "👯‍♀️" },
+    { name: "Blyss", avatar: "🌟" },
+    { name: "Charlotte", avatar: "🧁" },
+    { name: "Lincoln", avatar: "🎩" },
+    { name: "Haven", avatar: "🌈" },
+    { name: "Noah", avatar: "⚓" },
+    { name: "Spencer", avatar: "🚀" },
+    { name: "Charlie", avatar: "🐶" },
+    { name: "Landon", avatar: "⚽" }
+];
+
+export const SHOP_ITEMS: BrainrotItem[] = [
+  // 🟢 Common (Green)
+  { id: 'noobini_pizzanini', name: 'Noobini Pizzanini', price: 20, description: '+5 Base Money', emoji: '🍕', color: 'bg-green-500', rarity: 'common', effectType: 'base_money', value: 5 },
+  { id: 'noobini_santanini', name: 'Noobini Santanini', price: 25, description: '+2s Question Timer', emoji: '🎅', color: 'bg-green-500', rarity: 'common', effectType: 'timer', value: 2 },
+  { id: 'lirili_larila', name: 'Lirili Larila', price: 50, description: '+8 Base Money', emoji: '🎶', color: 'bg-green-500', rarity: 'common', effectType: 'base_money', value: 8 },
+  { id: 'tim_cheese', name: 'Tim Cheese', price: 75, description: '+10 Base Money', emoji: '🧀', color: 'bg-green-500', rarity: 'common', effectType: 'base_money', value: 10 },
+  { id: 'fluriflura', name: 'FluriFlura', price: 100, description: '+3s Question Timer', emoji: '🌸', color: 'bg-green-500', rarity: 'common', effectType: 'timer', value: 3 },
+  { id: 'talpa_di_fero', name: 'Talpa Di Fero', price: 125, description: '+12 Base Money', emoji: '🦦', color: 'bg-green-500', rarity: 'common', effectType: 'base_money', value: 12 },
+  { id: 'svinina_bombardino', name: 'Svinina Bombardino', price: 150, description: '+15 Base Money', emoji: '🐷', color: 'bg-green-500', rarity: 'common', effectType: 'base_money', value: 15 },
+  { id: 'raccooni_jandelini', name: 'Raccooni Jandelini', price: 175, description: '+4s Question Timer', emoji: '🦝', color: 'bg-green-500', rarity: 'common', effectType: 'timer', value: 4 },
+  { id: 'tartaragno', name: 'Tartaragno', price: 200, description: '+18 Base Money', emoji: '🐢', color: 'bg-green-500', rarity: 'common', effectType: 'base_money', value: 18 },
+  { id: 'pipi_kiwi', name: 'Pipi Kiwi', price: 225, description: '+20 Base Money', emoji: '🥝', color: 'bg-green-500', rarity: 'common', effectType: 'base_money', value: 20 },
+  { id: 'pipi_corni', name: 'Pipi Corni', price: 250, description: '+22 Base Money', emoji: '🌽', color: 'bg-green-500', rarity: 'common', effectType: 'base_money', value: 22 },
+
+  // 🔵 Rare (Blue)
+  { id: 'trippi_troppi', name: 'Trippi Troppi', price: 500, description: '+0.1x Money Multiplier', emoji: '🍄', color: 'bg-blue-500', rarity: 'rare', effectType: 'multiplier', value: 0.1 },
+  { id: 'tung_tung_tung', name: 'Tung Tung Tung Sahur', price: 600, description: '+0.15x Money Multiplier', emoji: '🥁', color: 'bg-blue-500', rarity: 'rare', effectType: 'multiplier', value: 0.15 },
+  { id: 'gangster_footera', name: 'Gangster Footera', price: 700, description: '+30 Base Money', emoji: '⚽', color: 'bg-blue-500', rarity: 'rare', effectType: 'base_money', value: 30 },
+  { id: 'bandito_bobritto', name: 'Bandito Bobritto', price: 800, description: '+5s Question Timer', emoji: '🌯', color: 'bg-blue-500', rarity: 'rare', effectType: 'timer', value: 5 },
+  { id: 'boneca_ambalabu', name: 'Boneca Ambalabu', price: 900, description: '+35 Base Money', emoji: '🎎', color: 'bg-blue-500', rarity: 'rare', effectType: 'base_money', value: 35 },
+  { id: 'cacto_hipopotamo', name: 'Cacto Hipopotamo', price: 1000, description: '+0.2x Money Multiplier', emoji: '🦛', color: 'bg-blue-500', rarity: 'rare', effectType: 'multiplier', value: 0.2 },
+  { id: 'ta_ta_ta_ta', name: 'Ta Ta Ta Ta Sahur', price: 1100, description: '+40 Base Money', emoji: '📢', color: 'bg-blue-500', rarity: 'rare', effectType: 'base_money', value: 40 },
+  { id: 'cupkake_koala', name: 'Cupkake Koala', price: 1200, description: '+6s Question Timer', emoji: '🐨', color: 'bg-blue-500', rarity: 'rare', effectType: 'timer', value: 6 },
+  { id: 'tric_trac_baraboom', name: 'Tric Trac Baraboom', price: 1300, description: '+45 Base Money', emoji: '💥', color: 'bg-blue-500', rarity: 'rare', effectType: 'base_money', value: 45 },
+  { id: 'frogo_elfo', name: 'Frogo Elfo', price: 1400, description: '+0.25x Money Multiplier', emoji: '🐸', color: 'bg-blue-500', rarity: 'rare', effectType: 'multiplier', value: 0.25 },
+  { id: 'pipi_avocado', name: 'Pipi Avocado', price: 1500, description: '+50 Base Money', emoji: '🥑', color: 'bg-blue-500', rarity: 'rare', effectType: 'base_money', value: 50 },
+  { id: 'pinealotto_fruttarino', name: 'Pinealotto Fruttarino', price: 1600, description: '+0.3x Money Multiplier', emoji: '🍍', color: 'bg-blue-500', rarity: 'rare', effectType: 'multiplier', value: 0.3 },
+
+  // 🟣 Epic (Purple)
+  { id: 'cappuccino_assassino', name: 'Cappuccino Assassino', price: 2500, description: '+0.4x Money Multiplier', emoji: '☕', color: 'bg-purple-500', rarity: 'epic', effectType: 'multiplier', value: 0.4 },
+  { id: 'bandito_axolito', name: 'Bandito Axolito', price: 2800, description: '+60 Base Money', emoji: '🦎', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 60 },
+  { id: 'brr_brr_patapim', name: 'Brr Brr Patapim', price: 3100, description: '+0.5x Money Multiplier', emoji: '🧊', color: 'bg-purple-500', rarity: 'epic', effectType: 'multiplier', value: 0.5 },
+  { id: 'avocadini_antilopini', name: 'Avocadini Antilopini', price: 3400, description: '+70 Base Money', emoji: '🦌', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 70 },
+  { id: 'trulimero_trulicina', name: 'Trulimero Trulicina', price: 3700, description: '+10s Question Timer', emoji: '🧙', color: 'bg-purple-500', rarity: 'epic', effectType: 'timer', value: 10 },
+  { id: 'bambini_crostini', name: 'Bambini Crostini', price: 4000, description: '+0.6x Money Multiplier', emoji: '🍞', color: 'bg-purple-500', rarity: 'epic', effectType: 'multiplier', value: 0.6 },
+  { id: 'malame_amarele', name: 'Malame Amarele', price: 4300, description: '+80 Base Money', emoji: '🟡', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 80 },
+  { id: 'bananita_dolphinita', name: 'Bananita Dolphinita', price: 4600, description: '+0.7x Money Multiplier', emoji: '🐬', color: 'bg-purple-500', rarity: 'epic', effectType: 'multiplier', value: 0.7 },
+  { id: 'perochello_lemonchello', name: 'Perochello Lemonchello', price: 4900, description: '+90 Base Money', emoji: '🍋', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 90 },
+  { id: 'brri_brri_bicus', name: 'Brri Brri Bicus Dicus', price: 5200, description: '+100 Base Money', emoji: '💣', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 100 },
+  { id: 'avocadini_guffo', name: 'Avocadini Guffo', price: 5500, description: '+0.8x Money Multiplier', emoji: '🦉', color: 'bg-purple-500', rarity: 'epic', effectType: 'multiplier', value: 0.8 },
+  { id: 'ti_ti_ti_sahur', name: 'Ti Ti Ti Sahur', price: 5800, description: '+110 Base Money', emoji: '⏰', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 110 },
+  { id: 'mangolini_parrocini', name: 'Mangolini Parrocini', price: 6100, description: '+0.9x Money Multiplier', emoji: '🦜', color: 'bg-purple-500', rarity: 'epic', effectType: 'multiplier', value: 0.9 },
+  { id: 'frogato_pirato', name: 'Frogato Pirato', price: 6400, description: '+120 Base Money', emoji: '🏴‍☠️', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 120 },
+  { id: 'penguin_tree', name: 'Penguin Tree', price: 6700, description: '+1.0x Money Multiplier', emoji: '🌲', color: 'bg-purple-500', rarity: 'epic', effectType: 'multiplier', value: 1.0 },
+  { id: 'penguino_cocosino', name: 'Penguino Cocosino', price: 7000, description: '+130 Base Money', emoji: '🥥', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 130 },
+  { id: 'salamino_penguino', name: 'Salamino Penguino', price: 7300, description: '+1.1x Money Multiplier', emoji: '🌭', color: 'bg-purple-500', rarity: 'epic', effectType: 'multiplier', value: 1.1 },
+  { id: 'doi_doi_do', name: 'Doi Doi Do', price: 7600, description: '+140 Base Money', emoji: '🎼', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 140 },
+  { id: 'wombo_rollo', name: 'Wombo Rollo', price: 7900, description: '+1.2x Money Multiplier', emoji: '🍥', color: 'bg-purple-500', rarity: 'epic', effectType: 'multiplier', value: 1.2 },
+  { id: 'mummio_rappitto', name: 'Mummio Rappitto', price: 8200, description: '+150 Base Money', emoji: '🤕', color: 'bg-purple-500', rarity: 'epic', effectType: 'base_money', value: 150 },
+
+  // 🟡 Legendary (Yellow)
+  { id: 'burbaloni_loliloli', name: 'Burbaloni Loliloli', price: 12000, description: '+2.0x Money Multiplier', emoji: '🍭', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 2.0 },
+  { id: 'chimpazini_bananini', name: 'Chimpazini Bananini', price: 14000, description: '+200 Base Money', emoji: '🐒', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 200 },
+  { id: 'tirilikalika', name: 'Tirilikalika', price: 16000, description: '+2.2x Money Multiplier', emoji: '🎭', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 2.2 },
+  { id: 'ballerina_cappuccina', name: 'Ballerina Cappuccina', price: 18000, description: '+250 Base Money', emoji: '🩰', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 250 },
+  { id: 'chef_crabracadabra', name: 'Chef Crabracadabra', price: 20000, description: '+2.5x Money Multiplier', emoji: '🦀', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 2.5 },
+  { id: 'lionel_cactuseli', name: 'Lionel Cactuseli', price: 22000, description: '+300 Base Money', emoji: '🌵', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 300 },
+  { id: 'quivioli_ameleonni', name: 'Quivioli Ameleonni', price: 25000, description: 'Protects Streak (Shield)', emoji: '🦎', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'shield', value: 1 },
+  { id: 'clickerino_crabo', name: 'Clickerino Crabo', price: 28000, description: '+2.8x Money Multiplier', emoji: '🖱️', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 2.8 },
+  { id: 'glorbo_fruttodrillo', name: 'Glorbo Fruttodrillo', price: 31000, description: '+350 Base Money', emoji: '🐊', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 350 },
+  { id: 'caramello_filtrello', name: 'Caramello Filtrello', price: 34000, description: '+3.0x Money Multiplier', emoji: '🍬', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 3.0 },
+  { id: 'pipi_potato', name: 'Pipi Potato', price: 37000, description: '+400 Base Money', emoji: '🥔', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 400 },
+  { id: 'blueberrini_octopusin', name: 'Blueberrini Octopusin', price: 40000, description: '+3.2x Money Multiplier', emoji: '🐙', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 3.2 },
+  { id: 'strawberelli_flamingelli', name: 'Strawberelli Flamingelli', price: 45000, description: '+450 Base Money', emoji: '🦩', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 450 },
+  { id: 'pandaccini_bananini', name: 'Pandaccini Bananini', price: 50000, description: '+3.5x Money Multiplier', emoji: '🐼', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 3.5 },
+  { id: 'quackula', name: 'Quackula', price: 55000, description: '+500 Base Money', emoji: '🦆', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 500 },
+  { id: 'cocosini_mama', name: 'Cocosini Mama', price: 60000, description: '+3.8x Money Multiplier', emoji: '🥥', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 3.8 },
+  { id: 'pi_pi_watermelon', name: 'Pi Pi Watermelon', price: 65000, description: '+550 Base Money', emoji: '🍉', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 550 },
+  { id: 'signore_carapace', name: 'Signore Carapace', price: 70000, description: '+4.0x Money Multiplier', emoji: '🐢', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 4.0 },
+  { id: 'sigma_boy', name: 'Sigma Boy', price: 75000, description: '+600 Base Money', emoji: '🗿', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 600 },
+  { id: 'chocco_bunny', name: 'Chocco Bunny', price: 80000, description: '+4.2x Money Multiplier', emoji: '🍫', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 4.2 },
+  { id: 'puffaball', name: 'Puffaball', price: 85000, description: '+650 Base Money', emoji: '🐡', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 650 },
+  { id: 'sealo_regalo', name: 'Sealo Regalo', price: 90000, description: '+4.5x Money Multiplier', emoji: '🦭', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 4.5 },
+  { id: 'sigma_girl', name: 'Sigma Girl', price: 95000, description: '+700 Base Money', emoji: '🎀', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'base_money', value: 700 },
+  { id: 'buho_de_fuego', name: 'Buho de Fuego', price: 100000, description: '+5.0x Money Multiplier', emoji: '🔥', color: 'bg-yellow-500', rarity: 'legendary', effectType: 'multiplier', value: 5.0 },
+
+  // 🔴 Mythic (Red)
+  { id: 'frigo_camelo', name: 'Frigo Camelo', price: 200000, description: '+10.0x Money Multiplier', emoji: '🐫', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 10.0 },
+  { id: 'orangutini_ananassini', name: 'Orangutini Ananassini', price: 250000, description: '+1000 Base Money', emoji: '🦧', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 1000 },
+  { id: 'rhino_toasterino', name: 'Rhino Toasterino', price: 300000, description: '+12.0x Money Multiplier', emoji: '🦏', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 12.0 },
+  { id: 'bombardiro_crocodilo', name: 'Bombardiro Crocodilo', price: 350000, description: '+1200 Base Money', emoji: '🐊', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 1200 },
+  { id: 'brutto_gialutto', name: 'Brutto Gialutto', price: 400000, description: '+15.0x Money Multiplier', emoji: '👹', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 15.0 },
+  { id: 'bombombini_gusini', name: 'Bombombini Gusini', price: 450000, description: '+1500 Base Money', emoji: '💣', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 1500 },
+  { id: 'avocadorilla', name: 'Avocadorilla', price: 500000, description: '+18.0x Money Multiplier', emoji: '🦍', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 18.0 },
+  { id: 'cavallo_virtuso', name: 'Cavallo Virtuso', price: 600000, description: '+1800 Base Money', emoji: '🐎', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 1800 },
+  { id: 'gorillo_subwoofero', name: 'Gorillo Subwoofero', price: 700000, description: '+20.0x Money Multiplier', emoji: '🔊', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 20.0 },
+  { id: 'gorillo_watermelondrillo', name: 'Gorillo Watermelondrillo', price: 800000, description: '+2000 Base Money', emoji: '🍉', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 2000 },
+  { id: 'tob_tobi_tobi', name: 'Tob Tobi Tobi', price: 900000, description: '+25.0x Money Multiplier', emoji: '🎭', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 25.0 },
+  { id: 'lerulerulerule', name: 'Lerulerulerule', price: 1000000, description: '+2500 Base Money', emoji: '🤪', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 2500 },
+  { id: 'ganganzelli_trulala', name: 'Ganganzelli Trulala', price: 1200000, description: '+30.0x Money Multiplier', emoji: '🎪', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 30.0 },
+  { id: 'te_te_te_sahur', name: 'Te Te Te Sahur', price: 1400000, description: '+3000 Base Money', emoji: '🍽️', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 3000 },
+  { id: 'rhino_helicopterino', name: 'Rhino Helicopterino', price: 1600000, description: '+35.0x Money Multiplier', emoji: '🚁', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 35.0 },
+  { id: 'magi_ribbitini', name: 'Magi Ribbitini', price: 1800000, description: '+3500 Base Money', emoji: '🧙‍♂️', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 3500 },
+  { id: 'tracoducotulu', name: 'Tracoducotulu Delapeladustuz', price: 2000000, description: '+40.0x Money Multiplier', emoji: '📜', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 40.0 },
+  { id: 'jingle_jingle_sahur', name: 'Jingle Jingle Sahur', price: 2500000, description: '+4000 Base Money', emoji: '🔔', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 4000 },
+  { id: 'los_noobinis', name: 'Los Noobinis', price: 3000000, description: '+50.0x Money Multiplier', emoji: '👥', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 50.0 },
+  { id: 'cachorrito_melonito', name: 'Cachorrito Melonito', price: 4000000, description: '+5000 Base Money', emoji: '🐶', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 5000 },
+  { id: 'carloo', name: 'Carloo', price: 5000000, description: '+60.0x Money Multiplier', emoji: '🚗', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 60.0 },
+  { id: 'elephanto_frigo', name: 'Elephanto Frigo', price: 7500000, description: '+6000 Base Money', emoji: '🐘', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 6000 },
+  { id: 'jacko_spaventosa', name: 'Jacko Spaventosa', price: 10000000, description: '+75.0x Money Multiplier', emoji: '🎃', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 75.0 },
+  { id: 'centrucci_nuclucci', name: 'Centrucci Nuclucci', price: 25000000, description: '+10,000 Base Money', emoji: '☢️', color: 'bg-red-600', rarity: 'mythic', effectType: 'base_money', value: 10000 },
+  { id: 'toiletto_focaccino', name: 'Toiletto Focaccino', price: 50000000, description: '+100.0x Money Multiplier', emoji: '🚽', color: 'bg-red-600', rarity: 'mythic', effectType: 'multiplier', value: 100.0 },
+  { id: 'tree_tree_tree_sahur', name: 'Tree Tree Tree Sahur', price: 100000000, description: 'Question timer is infinite (+60s)', emoji: '🌳', color: 'bg-red-600', rarity: 'mythic', effectType: 'timer', value: 60 },
+];

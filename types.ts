@@ -1,73 +1,50 @@
 
-export type CardType = 'attack' | 'skill' | 'power';
-
-export type MathTopic = 'arithmetic' | 'algebra' | 'geometry' | 'percentage' | 'addition' | 'subtraction' | 'integer' | 'multiplication' | 'division' | 'exponent' | 'factorization' | 'pemdas' | 'absolute_value' | 'prime_factors' | 'subtraction_3digit' | 'decimal_addition' | 'decimal_multiplication' | 'decimal_division' | 'fraction_simplification' | 'integer_word_problem';
-
-export interface Card {
-  id: string;
-  name: string;
-  type: CardType;
-  cost: number;
-  value: number; // Damage or Block amount
-  description: string;
-  effectId: string; // ID to map to logic
-  rarity: 'common' | 'rare' | 'epic';
-  mathType?: MathTopic; // Optional: Force a specific math problem type for this card
-  upgraded?: boolean; // New flag for upgrade status
+export interface MathProblem {
+  question: string;
+  answer: string;
+  options: string[]; // Array of 4 choices including the answer
+  difficulty: number; // 1-5
 }
 
-export interface EnemyIntent {
-  type: 'attack' | 'defend' | 'buff' | 'debuff' | 'poison' | 'drain';
+export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+
+export interface BrainrotItem {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  emoji: string;
+  color: string;
+  rarity: Rarity;
+  effectType: 'multiplier' | 'timer' | 'base_money' | 'shield' | 'streak_bonus';
   value: number;
 }
 
-export interface Enemy {
+export interface Bot {
   id: string;
   name: string;
-  maxHp: number;
-  currentHp: number;
-  block: number; // Added block property
-  intent: EnemyIntent;
-  image: string;
+  avatar: string;
+  inventory: string[];
+  // Vulnerability Mechanics
+  isVulnerable: boolean;
+  nextVulnerableTime: number; // Timestamp when they will become vulnerable next
+  vulnerableUntil: number; // Timestamp when vulnerability ends
+  nextBuyTime: number; // Timestamp for next purchase
 }
-
-export interface Player {
-  maxHp: number;
-  currentHp: number;
-  energy: number;
-  maxEnergy: number;
-  block: number;
-  gold: number; // New currency
-  deck: Card[];
-  discardPile: Card[];
-  drawPile: Card[];
-  hand: Card[];
-  relics: string[];
-  poison: number; // New mechanic: 0 = none, 3 = start of 3-2-1 countdown
-}
-
-export type GameScreen = 'MENU' | 'MAP' | 'COMBAT' | 'EVENT' | 'REWARD' | 'GAME_OVER' | 'VICTORY' | 'TIER_TRANSITION';
 
 export interface GameState {
-  screen: GameScreen;
-  player: Player;
-  currentEnemies: Enemy[]; // Changed from single currentEnemy
-  floor: number;
-  tier: number; // 1 or 2
-  map: MapNode[];
-  currentMapNodeId: string | null;
-  tutorialSeen: boolean;
-  poisonTutorialSeen: boolean;
-  lastRewardGold: number; // Added field
-}
-
-export type RoomType = 'combat' | 'elite' | 'event' | 'rest' | 'boss';
-
-export interface MapNode {
-  id: string;
-  type: RoomType;
-  x: number;
-  y: number;
-  next: string[]; // IDs of connected next nodes
-  completed: boolean;
+  money: number;
+  inventory: string[]; // List of item IDs
+  streak: number;
+  totalAnswered: number;
+  multiplier: number;
+  baseMoney: number;
+  timerBonus: number;
+  shieldActive: boolean;
+  godMode: boolean; // New God Mode flag
+  streakBonusMult: number;
+  bots: Bot[];
+  nextAttackTime: number; // Timestamp for when the base needs shielding
+  consecutiveTimeouts: number; // Track how many timers expired in a row
+  rebirths: number; // Number of times rebirthed
 }
