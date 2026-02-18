@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { GameState, Card, MapNode, Enemy } from './types';
 import { CARDS, STARTING_DECK_IDS, ENEMIES, GENERATE_MAP, INITIAL_PLAYER_HP, INITIAL_MAX_ENERGY } from './constants';
 import { GameMap } from './components/GameMap';
@@ -46,12 +46,6 @@ const INITIAL_STATE: GameState = {
 const App: React.FC = () => {
     const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
     
-    // Fallback to sensible defaults (100vh) if window size reads 0 initially
-    const [windowSize, setWindowSize] = useState({ 
-        w: window.innerWidth || 800, 
-        h: window.innerHeight || 600 
-    });
-    
     // Dev Mode State
     const [isDevOpen, setIsDevOpen] = useState(false);
     const [devPassword, setDevPassword] = useState('');
@@ -65,29 +59,6 @@ const App: React.FC = () => {
     // Reward Logic
     const [pendingRewards, setPendingRewards] = useState(0);
     const [rewardTutorialSeen, setRewardTutorialSeen] = useState(false);
-
-    // FIX: Handle device resize quirks
-    useEffect(() => {
-        const handleResize = () => {
-            // Ensure non-zero values
-            const w = window.innerWidth || document.documentElement.clientWidth || 800;
-            const h = window.innerHeight || document.documentElement.clientHeight || 600;
-            setWindowSize({ w, h });
-        };
-        
-        window.addEventListener('resize', handleResize);
-        
-        // Force multiple checks to catch post-load resize (common in iframes)
-        const timeouts = [100, 500, 1000, 2000].map(t => setTimeout(handleResize, t));
-
-        // Initial check
-        handleResize();
-
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            timeouts.forEach(clearTimeout);
-        };
-    }, []);
 
     const startGame = () => {
         const deck = createInitialDeck();
