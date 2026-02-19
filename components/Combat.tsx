@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Enemy, Card as CardType } from '../types';
 import { CardComponent } from './Card';
@@ -350,8 +351,10 @@ export const Combat: React.FC<CombatProps> = ({
         case 'block_enemy':
             const target = getTarget();
             if (target) {
-                const amt = card.effectId === 'block_enemy' && card.name === 'Golden Ratio' ? player.block : target.currentHp; 
-                // If it is Golden Ratio, it doubles block, otherwise copies enemy HP
+                // Modified to cap max block from enemy HP at 10 (unless it's Golden Ratio which doubles block)
+                const rawAmt = target.currentHp;
+                const amt = card.name === 'Golden Ratio' ? player.block : Math.min(10, rawAmt); 
+                
                 if (card.name === 'Golden Ratio') {
                     triggerVfx(`Block Doubled!`, "block", "player");
                     setPlayer(p => ({...p, block: p.block * 2 }));
@@ -743,19 +746,19 @@ export const Combat: React.FC<CombatProps> = ({
           return { type: 'defend' as const, value: 8 }; // 30% Heavy Defend
       }
 
-      // Tier 3 Mini-Boss: The Limit Guardian
+      // Tier 3 Mini-Boss: The Limit Guardian - NERFED
       if (enemy && enemy.id.includes('miniboss_guardian')) {
           if (lastType === 'defend') {
               // After defend, heavy attack
-              return { type: 'attack' as const, value: 12 };
+              return { type: 'attack' as const, value: 8 }; // Reduced from 12
           }
           // 50/50 Chance to Defend heavy or Attack
           const r = Math.random();
           if (r > 0.5) return { type: 'defend' as const, value: 15 };
-          return { type: 'attack' as const, value: 9 };
+          return { type: 'attack' as const, value: 6 }; // Reduced from 9
       }
 
-      // Tier 3 Boss Logic (Infinite Prime) - Relentless Scaling
+      // Tier 3 Boss Logic (Infinite Prime) - Relentless Scaling - NERFED
       if (enemy && enemy.id.includes('boss-infinite')) {
            const r = Math.random();
            // Phase 2 Logic (Usually phase is undefined or 1 initially, but updated in dealDamage)
@@ -763,16 +766,17 @@ export const Combat: React.FC<CombatProps> = ({
            
            if (isPhase2) {
                // More aggressive in Phase 2
-               if (lastType === 'defend') return { type: 'attack' as const, value: 18 }; 
+               if (lastType === 'defend') return { type: 'attack' as const, value: 12 }; // Reduced from 18
                if (r < 0.1) return { type: 'defend' as const, value: 25 }; 
-               return { type: 'attack' as const, value: 12 };
+               return { type: 'attack' as const, value: 8 }; // Reduced from 12
            }
 
-           if (lastType === 'defend') return { type: 'attack' as const, value: 15 }; 
+           // Phase 1
+           if (lastType === 'defend') return { type: 'attack' as const, value: 10 }; // Reduced from 15
            
            if (r < 0.2) return { type: 'defend' as const, value: 20 }; 
-           if (r < 0.6) return { type: 'attack' as const, value: 15 }; 
-           return { type: 'attack' as const, value: 8 }; 
+           if (r < 0.6) return { type: 'attack' as const, value: 10 }; // Reduced from 15
+           return { type: 'attack' as const, value: 6 }; // Reduced from 8
       }
       
       // Poison Enemy Logic

@@ -1,4 +1,5 @@
 
+
 import { Card, Enemy, MapNode } from './types';
 
 export const INITIAL_PLAYER_HP = 20;
@@ -163,7 +164,7 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     type: 'skill',
     cost: 1,
     value: 0,
-    description: 'Gain Block equal to the target enemy\'s HP.',
+    description: 'Gain Block equal to the target enemy\'s HP (Max 10).',
     effectId: 'block_enemy',
     rarity: 'epic',
     mathType: 'algebra'
@@ -456,7 +457,7 @@ export const ENEMIES: Enemy[] = [
     maxHp: 15,
     currentHp: 15,
     block: 0,
-    intent: { type: 'attack', value: 8 },
+    intent: { type: 'attack', value: 6 }, // Nerfed from 8
     image: SVG_CHAOS_CALCULUS
   },
   // TIER 3 BOSS
@@ -466,7 +467,7 @@ export const ENEMIES: Enemy[] = [
     maxHp: 20, // Initial Phase 1 Health (Weak)
     currentHp: 20,
     block: 0,
-    intent: { type: 'attack', value: 12 },
+    intent: { type: 'attack', value: 8 }, // Nerfed from 12
     image: SVG_BOSS_INFINITE,
     phase: 1
   },

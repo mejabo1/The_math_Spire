@@ -40,7 +40,7 @@ export const generateProblem = (forcedTopic?: MathTopic, tier: number = 1): Math
     case 'factorization': return generateFactorization();
     case 'pemdas': return generatePEMDAS(tier);
     case 'absolute_value': return generateAbsoluteValue();
-    case 'prime_factors': return generatePrimeFactors();
+    // Removed prime_factors case
     
     // New Topics
     case 'subtraction_3digit': return generateSubtraction3Digit();
@@ -242,39 +242,6 @@ const generateAbsoluteValue = (): MathProblem => {
       const ans = val + v2;
       return { question: `|${neg}| + |${v2}| = ?`, options: generateOptions(ans), correctAnswer: ans.toString(), topic: 'Absolute Value' };
   }
-};
-
-const generatePrimeFactors = (): MathProblem => {
-  const primes = [2, 3, 5, 7];
-  const count = getRandomInt(2, 3);
-  const factors: number[] = [];
-  let product = 1;
-  for(let i=0; i<count; i++) {
-    const p = primes[getRandomInt(0, primes.length - 1)];
-    factors.push(p);
-    product *= p;
-  }
-  factors.sort((a,b) => a-b);
-  const correctAnswer = factors.join(' × ');
-  const options = new Set<string>();
-  options.add(correctAnswer);
-  while(options.size < 4) {
-     const r = Math.random();
-     if (r < 0.4) {
-         const wrongFactors = [...factors];
-         wrongFactors[getRandomInt(0, wrongFactors.length-1)] = primes[getRandomInt(0, primes.length-1)];
-         wrongFactors.sort((a,b) => a-b);
-         options.add(wrongFactors.join(' × '));
-     } else if (r < 0.7) {
-         const wf = [];
-         for(let i=0; i<count; i++) wf.push(primes[getRandomInt(0, primes.length-1)]);
-         wf.sort((a,b) => a-b);
-         options.add(wf.join(' × '));
-     } else {
-         options.add(`1 × ${product}`);
-     }
-  }
-  return { question: `Prime factorization of ${product}?`, options: Array.from(options).sort(() => Math.random() - 0.5), correctAnswer: correctAnswer, topic: 'Prime Factors' };
 };
 
 const generateSubtraction3Digit = (): MathProblem => {
