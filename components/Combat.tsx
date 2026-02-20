@@ -494,7 +494,7 @@ export const Combat: React.FC<CombatProps> = ({
                 const newHp = e.currentHp - unblocked;
                 
                 // Infinite Prime Phase Transition Check
-                if (tier === 3 && e.id.includes('boss') && (!e.phase || e.phase === 1) && newHp <= 0) {
+                if (tier === 3 && e.id === 'boss-3' && (!e.phase || e.phase === 1) && newHp <= 0) {
                      triggerVfx("INFINITE!", "info", e.id);
                      showEnemyTaunt(e.id, "How can you defeat that which is infinite?");
                      
@@ -562,7 +562,7 @@ export const Combat: React.FC<CombatProps> = ({
 
                 // --- SPECIAL EVENT: Mr. Gremillion's Homework Pass ---
                 // If player is dying in Tier 3 boss fight and hasn't used the pass yet
-                const isFinalBoss = tier === 3 && enemies.some(e => e.id.includes('boss-infinite'));
+                const isFinalBoss = tier === 3 && enemies.some(e => e.id === 'boss-3');
                 if (newHp <= 0 && isFinalBoss && !hasGremillionRevived) {
                     // Trigger the save!
                     newHp = prev.maxHp; // Full Heal
@@ -722,7 +722,7 @@ export const Combat: React.FC<CombatProps> = ({
       const lastType = enemy?.intent.type;
 
       // Tier 1 Boss Logic (Poly-Gone)
-      if (enemy && enemy.id.includes('boss-geometry')) {
+      if (enemy && (enemy.id.includes('boss-geometry') || enemy.id === 'boss-1')) {
           if (lastType === 'defend') {
                return { type: 'attack' as const, value: 5 + tier }; 
           }
@@ -732,7 +732,7 @@ export const Combat: React.FC<CombatProps> = ({
       }
 
       // Tier 2 Boss Logic (Prime Predator) - Vampirism/Drain
-      if (enemy && enemy.id.includes('boss-predator')) {
+      if (enemy && (enemy.id.includes('boss-predator') || enemy.id === 'boss-2')) {
           if (lastType === 'defend') {
               // Can't defend, re-roll between drain (40%) and attack (30%). Normalized: 4/7 vs 3/7.
               const r = Math.random();
@@ -759,7 +759,7 @@ export const Combat: React.FC<CombatProps> = ({
       }
 
       // Tier 3 Boss Logic (Infinite Prime) - Relentless Scaling - NERFED
-      if (enemy && enemy.id.includes('boss-infinite')) {
+      if (enemy && (enemy.id.includes('boss-infinite') || enemy.id === 'boss-3')) {
            const r = Math.random();
            // Phase 2 Logic (Usually phase is undefined or 1 initially, but updated in dealDamage)
            const isPhase2 = enemy.phase === 2;
