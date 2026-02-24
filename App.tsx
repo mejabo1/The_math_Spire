@@ -1,13 +1,13 @@
 
 import React, { useState } from 'react';
 import { GameState, Card, MapNode, Enemy } from './types';
-import { CARDS, STARTING_DECK_IDS, ENEMIES, GENERATE_MAP, INITIAL_PLAYER_HP, INITIAL_MAX_ENERGY } from './constants';
+import { CARDS, STARTING_DECK_IDS, ENEMIES, GENERATE_MAP, GENERATE_JIMMY_MAP, JIMMY_WIN_TAUNTS, JIMMY_LOSE_TAUNTS, JIMMY_EXCUSES, INITIAL_PLAYER_HP, INITIAL_MAX_ENERGY } from './constants';
 import { GameMap } from './components/GameMap';
 import { Combat } from './components/Combat';
 import { EventRoom } from './components/EventRoom';
 import { CardReward } from './components/CardReward';
 import { TierTransition } from './components/TierTransition';
-import { Play, RotateCw, Wrench, X, Bug, Trophy, Skull, FastForward, ArrowLeft } from 'lucide-react';
+import { Play, RotateCw, Wrench, X, Bug, Trophy, Skull, FastForward, ArrowLeft, Flame } from 'lucide-react';
 
 const createInitialDeck = (): Card[] => {
     return STARTING_DECK_IDS.map(id => ({
@@ -40,7 +40,8 @@ const INITIAL_STATE: GameState = {
     currentMapNodeId: null,
     tutorialSeen: false,
     poisonTutorialSeen: false,
-    lastRewardGold: 0
+    lastRewardGold: 0,
+    gameMode: 'standard'
 };
 
 const App: React.FC = () => {
@@ -55,10 +56,14 @@ const App: React.FC = () => {
     // Cheat Toggles
     const [devGodMode, setDevGodMode] = useState(false);
     const [devOneHpMode, setDevOneHpMode] = useState(false);
+    const [devSkipMath, setDevSkipMath] = useState(false);
 
     // Reward Logic
     const [pendingRewards, setPendingRewards] = useState(0);
     const [rewardTutorialSeen, setRewardTutorialSeen] = useState(false);
+
+    // Jimmy's Taunt State
+    const [jimmyTaunt, setJimmyTaunt] = useState<string | null>(null);
 
     const startGame = () => {
         const deck = createInitialDeck();
@@ -70,7 +75,29 @@ const App: React.FC = () => {
                 ...INITIAL_STATE.player,
                 deck: deck,
                 drawPile: [...deck]
-            }
+            },
+            gameMode: 'standard'
+        });
+        setRewardTutorialSeen(false);
+    };
+
+    const startJimmyChallenge = () => {
+        const deck = createInitialDeck();
+        setGameState({
+            ...INITIAL_STATE,
+            screen: 'MAP',
+            map: GENERATE_JIMMY_MAP(),
+            player: {
+                ...INITIAL_STATE.player,
+                deck: deck,
+                drawPile: [...deck],
+                maxHp: 40, // More HP for endurance
+                currentHp: 40
+            },
+            gameMode: 'jimmy_challenge',
+            tier: 3, // Force Tier 3 difficulty for math
+            tutorialSeen: true,
+            poisonTutorialSeen: true
         });
         setRewardTutorialSeen(false);
     };
@@ -173,7 +200,9 @@ const App: React.FC = () => {
             // Scaling logic
             let min = 1, max = 1;
             
-            if (gameState.tier === 1) {
+            if (gameState.gameMode === 'jimmy_challenge') {
+                min = 2; max = 3; // Always hard
+            } else if (gameState.tier === 1) {
                 if (floor === 2) { max = 2; }
                 if (floor >= 3) { min = 2; max = 3; }
             } else if (gameState.tier === 2) {
@@ -187,11 +216,12 @@ const App: React.FC = () => {
             
             // Enemy Pool Construction
             let pool = [ENEMIES[0], ENEMIES[1]]; 
-            if (gameState.tier >= 2) {
+            if (gameState.tier >= 2 || gameState.gameMode === 'jimmy_challenge') {
                 pool.push(ENEMIES[4]); // Venomous Variable
             }
-            if (gameState.tier === 3) {
+            if (gameState.tier === 3 || gameState.gameMode === 'jimmy_challenge') {
                 pool.push(ENEMIES[7]); // Chaos Calculus (New T3 Enemy)
+                pool.push(ENEMIES[2]); // Fraction Phantom
             }
             
             for(let i=0; i<count; i++) {
@@ -209,8 +239,18 @@ const App: React.FC = () => {
             isCombatNode = true;
             
             // CHECK FOR MINI-BOSS GUARDIAN (Tier 3, Node 4-5)
-            if (gameState.tier === 3 && node.id === '4-5') {
+            if (gameState.tier === 3 && node.id === '4-5' && gameState.gameMode !== 'jimmy_challenge') {
                  const template = ENEMIES.find(e => e.id === 'miniboss_guardian') || ENEMIES[6]; // Fallback if not found
+                 enemies.push({
+                    ...template,
+                    id: `${template.id}-${Date.now()}`,
+                    currentHp: devOneHpMode ? 1 : template.maxHp,
+                    maxHp: devOneHpMode ? 1 : template.maxHp
+                });
+            } else if (gameState.gameMode === 'jimmy_challenge') {
+                 // Jimmy Challenge Elites: Mix of MiniBoss and Mimic
+                 const r = Math.random();
+                 const template = r > 0.5 ? ENEMIES[9] : ENEMIES[6]; // Limit Guardian or Mimic
                  enemies.push({
                     ...template,
                     id: `${template.id}-${Date.now()}`,
@@ -239,12 +279,13 @@ const App: React.FC = () => {
             
             // SPAWN CORRECT BOSS BASED ON TIER
             let template = ENEMIES[3]; // Default Tier 1: Poly-Gone
-            if (gameState.tier === 2) template = ENEMIES[5]; // Tier 2: Predator
-            if (gameState.tier === 3) template = ENEMIES[8]; // Tier 3: Infinite Prime
+            if (gameState.gameMode === 'jimmy_challenge') template = ENEMIES[10]; // Jimmy
+            else if (gameState.tier === 2) template = ENEMIES[5]; // Tier 2: Predator
+            else if (gameState.tier === 3) template = ENEMIES[8]; // Tier 3: Infinite Prime
             
             enemies.push({
                 ...template,
-                id: `boss-${gameState.tier}`,
+                id: gameState.gameMode === 'jimmy_challenge' ? 'boss-jimmy' : `boss-${gameState.tier}`,
                 currentHp: devOneHpMode ? 1 : template.maxHp,
                 maxHp: devOneHpMode ? 1 : template.maxHp
             });
@@ -280,7 +321,8 @@ const App: React.FC = () => {
     const handleCombatVictory = (remainingHp: number) => {
         const currentNode = gameState.map.find(n => n.id === gameState.currentMapNodeId);
         const isElite = currentNode?.type === 'elite';
-        const isBoss = currentNode?.type === 'boss' || gameState.currentEnemies.some(e => e.id.includes('boss'));
+        // Fix: Use startsWith('boss-') to avoid matching 'miniboss_guardian'
+        const isBoss = currentNode?.type === 'boss' || gameState.currentEnemies.some(e => e.id.startsWith('boss-'));
         const isMiniBoss = gameState.currentEnemies.some(e => e.id.includes('miniboss_guardian'));
         
         // Reward Logic
@@ -300,8 +342,15 @@ const App: React.FC = () => {
         // Difficulty Multiplier
         goldReward = goldReward * gameState.tier;
 
+        // JIMMY TAUNT ON VICTORY
+        if (gameState.gameMode === 'jimmy_challenge') {
+            const taunt = JIMMY_WIN_TAUNTS[Math.floor(Math.random() * JIMMY_WIN_TAUNTS.length)];
+            setJimmyTaunt(taunt);
+            setTimeout(() => setJimmyTaunt(null), 4000);
+        }
+
         setGameState(prev => {
-            if (isBoss && prev.tier === 3) {
+            if (isBoss && prev.tier === 3 && prev.gameMode !== 'jimmy_challenge') {
                  // Final Victory if beating Boss 3 (The Infinite Prime)
                  return {
                     ...prev,
@@ -316,8 +365,23 @@ const App: React.FC = () => {
                 };
             }
 
+            if (isBoss && prev.gameMode === 'jimmy_challenge') {
+                 // Victory over Jimmy
+                 return {
+                    ...prev,
+                    screen: 'VICTORY',
+                    currentEnemies: [],
+                    player: { 
+                        ...prev.player, 
+                        currentHp: remainingHp,
+                        gold: prev.player.gold + goldReward
+                    },
+                    lastRewardGold: goldReward
+                };
+            }
+
             // Skip Reward Screen for Bosses -> Go directly to Transition
-            if (isBoss && (prev.tier === 1 || prev.tier === 2)) {
+            if (isBoss && (prev.tier === 1 || prev.tier === 2) && prev.gameMode !== 'jimmy_challenge') {
                 return {
                     ...prev,
                     screen: 'TIER_TRANSITION',
@@ -351,6 +415,11 @@ const App: React.FC = () => {
     };
 
     const handleCombatDefeat = () => {
+        if (gameState.gameMode === 'jimmy_challenge') {
+            const taunt = JIMMY_LOSE_TAUNTS[Math.floor(Math.random() * JIMMY_LOSE_TAUNTS.length)];
+            setJimmyTaunt(taunt);
+            // Don't clear it automatically on defeat, let it linger on Game Over screen
+        }
         setGameState(prev => ({ ...prev, screen: 'GAME_OVER' }));
     };
 
@@ -500,6 +569,15 @@ const App: React.FC = () => {
                             </button>
 
                             <button 
+                                onClick={startJimmyChallenge}
+                                className="group relative px-8 py-3 bg-red-900 hover:bg-red-800 border border-red-500/50 text-white text-lg font-bold rounded-full shadow-lg transition-all hover:scale-105 hover:shadow-red-500/20 overflow-hidden"
+                            >
+                                <span className="relative z-10 flex items-center justify-center gap-3">
+                                    <Flame className="text-red-400" /> Jimmy's Challenge
+                                </span>
+                            </button>
+
+                            <button 
                                 onClick={() => setIsDevOpen(true)}
                                 className="text-slate-500 hover:text-slate-300 text-sm mt-8 flex items-center justify-center gap-2 transition-colors"
                             >
@@ -507,6 +585,17 @@ const App: React.FC = () => {
                             </button>
                         </div>
                     </div>
+
+                    {/* JIMMY TAUNT OVERLAY */}
+                    {jimmyTaunt && (
+                        <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[100] animate-bounce-in">
+                            <div className="bg-yellow-400 text-black font-bold p-6 rounded-2xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] max-w-md text-center relative">
+                                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[20px] border-t-yellow-400"></div>
+                                <p className="text-xl font-serif">"{jimmyTaunt}"</p>
+                                <p className="text-xs uppercase tracking-widest mt-2 opacity-70">- Jimmy</p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* DEV TOOLS MODAL */}
                     {isDevOpen && (
@@ -541,6 +630,10 @@ const App: React.FC = () => {
                                                     <input type="checkbox" checked={devOneHpMode} onChange={(e) => setDevOneHpMode(e.target.checked)} className="accent-amber-500 w-5 h-5" />
                                                     <span className={devOneHpMode ? "text-green-400 font-bold" : "text-slate-300"}>1 HP Enemies</span>
                                                 </label>
+                                                <label className="flex items-center gap-3 cursor-pointer hover:bg-slate-700/50 p-2 rounded">
+                                                    <input type="checkbox" checked={devSkipMath} onChange={(e) => setDevSkipMath(e.target.checked)} className="accent-amber-500 w-5 h-5" />
+                                                    <span className={devSkipMath ? "text-green-400 font-bold" : "text-slate-300"}>Skip Math</span>
+                                                </label>
                                             </div>
                                         </div>
 
@@ -552,6 +645,9 @@ const App: React.FC = () => {
                                                 </button>
                                                 <button onClick={startTierThreeGame} className="bg-indigo-900/50 hover:bg-indigo-800 border border-indigo-500/30 text-indigo-200 py-2 rounded text-sm font-bold flex items-center justify-center gap-2">
                                                     <FastForward size={14} /> Start Tier 3
+                                                </button>
+                                                <button onClick={startJimmyChallenge} className="col-span-2 bg-red-900/50 hover:bg-red-800 border border-red-500/30 text-red-200 py-2 rounded text-sm font-bold flex items-center justify-center gap-2">
+                                                    <Flame size={14} /> Start Jimmy's Challenge
                                                 </button>
                                             </div>
                                         </div>
@@ -604,6 +700,7 @@ const App: React.FC = () => {
                     onTutorialComplete={handleTutorialComplete}
                     tier={gameState.tier}
                     tutorialType={gameState.tier === 2 && !gameState.poisonTutorialSeen ? 'poison' : 'intro'}
+                    devSkipMath={devSkipMath}
                 />
             )}
 
@@ -637,26 +734,93 @@ const App: React.FC = () => {
 
             {/* SCREEN: VICTORY */}
             {gameState.screen === 'VICTORY' && (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 bg-[url('https://images.unsplash.com/photo-1519681393798-38e363ba352e?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center">
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-                    <div className="relative z-10 text-center p-8 bg-slate-800/80 rounded-3xl border-4 border-amber-500 shadow-2xl animate-fade-in max-w-2xl">
-                        <Trophy size={80} className="text-yellow-400 mx-auto mb-6 animate-bounce-slow" />
-                        <h1 className="text-6xl font-serif text-amber-100 mb-4">Victory!</h1>
-                        <p className="text-2xl text-slate-300 mb-8">
-                            You have conquered the Spire and defeated the Infinite Prime!
-                        </p>
-                        <div className="flex flex-col gap-2 mb-8 text-lg font-mono text-amber-200">
-                             <p>Gold Collected: {gameState.player.gold}</p>
-                             <p>Deck Size: {gameState.player.deck.length}</p>
+                gameState.gameMode === 'jimmy_challenge' ? (
+                    // JIMMY'S SPECIAL VICTORY SCREEN
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-yellow-400 relative overflow-hidden">
+                        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/notebook.png')]"></div>
+                        
+                        <div className="relative z-10 text-center p-8 max-w-3xl animate-bounce-in">
+                            <div className="bg-white text-black p-8 rounded-3xl border-8 border-black shadow-[20px_20px_0px_0px_rgba(0,0,0,1)] transform -rotate-2">
+                                <h1 className="text-6xl md:text-8xl font-black mb-6 uppercase tracking-tighter transform rotate-2 text-red-600">
+                                    WHAT?!
+                                </h1>
+                                <p className="text-2xl md:text-4xl font-bold mb-8 font-mono">
+                                    "IMPOSSIBLE! {JIMMY_EXCUSES[Math.floor(Math.random() * JIMMY_EXCUSES.length)]}"
+                                </p>
+                                
+                                <div className="bg-slate-100 p-6 rounded-xl border-4 border-slate-300 mb-8 transform rotate-1">
+                                    <h2 className="text-xl font-bold text-slate-500 uppercase tracking-widest mb-4">Official Certificate of Nerdiness</h2>
+                                    <p className="text-lg">This certifies that</p>
+                                    <p className="text-3xl font-script text-blue-600 my-2">The Player</p>
+                                    <p className="text-lg">is way too good at math games.</p>
+                                    <div className="mt-6 flex justify-center gap-8 text-sm text-slate-400 font-mono">
+                                        <div>Signed: <span className="font-script text-red-500 text-xl">Jimmy (under protest)</span></div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={() => setGameState(INITIAL_STATE)}
+                                    className="bg-black hover:bg-slate-800 text-white text-2xl font-bold py-4 px-12 rounded-full shadow-lg transition-transform hover:scale-110 hover:-rotate-2"
+                                >
+                                    Whatever, Play Again
+                                </button>
+                            </div>
                         </div>
-                        <button 
-                            onClick={() => setGameState(INITIAL_STATE)}
-                            className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-transform hover:scale-105 flex items-center gap-3 mx-auto"
-                        >
-                            <RotateCw /> Play Again
-                        </button>
+                        
+                        {/* Confetti falling (CSS animation could be added here, but simple text for now) */}
+                        <div className="absolute top-10 left-10 text-6xl animate-pulse">😭</div>
+                        <div className="absolute bottom-10 right-10 text-6xl animate-pulse">📉</div>
                     </div>
-                </div>
+                ) : (
+                    // STANDARD VICTORY SCREEN
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 bg-[url('https://images.unsplash.com/photo-1519681393798-38e363ba352e?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center">
+                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+                        <div className="relative z-10 text-center p-8 bg-slate-800/80 rounded-3xl border-4 border-amber-500 shadow-2xl animate-fade-in max-w-2xl">
+                            <Trophy size={80} className="text-yellow-400 mx-auto mb-6 animate-bounce-slow" />
+                            <h1 className="text-6xl font-serif text-amber-100 mb-4">Victory!</h1>
+                            <p className="text-2xl text-slate-300 mb-8">
+                                You have conquered the Spire and defeated the Infinite Prime!
+                            </p>
+                            <div className="flex flex-col gap-2 mb-8 text-lg font-mono text-amber-200">
+                                 <p>Gold Collected: {gameState.player.gold}</p>
+                                 <p>Deck Size: {gameState.player.deck.length}</p>
+                            </div>
+                            
+                            <div className="flex flex-col gap-4 w-full max-w-xs mx-auto">
+                                <button 
+                                    onClick={() => {
+                                        // NEW GAME PLUS LOGIC
+                                        const currentDeck = gameState.player.deck;
+                                        setGameState({
+                                            ...INITIAL_STATE,
+                                            screen: 'MAP',
+                                            map: GENERATE_MAP(1),
+                                            player: {
+                                                ...INITIAL_STATE.player,
+                                                deck: currentDeck, // KEEP THE DECK
+                                                drawPile: [...currentDeck],
+                                                gold: 100, // Bonus gold for NG+
+                                                maxHp: INITIAL_PLAYER_HP + 10 // Slight HP Buff for NG+
+                                            },
+                                            tutorialSeen: true,
+                                            poisonTutorialSeen: true
+                                        });
+                                    }}
+                                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform hover:scale-105 flex items-center justify-center gap-3"
+                                >
+                                    <FastForward /> New Game + (Keep Deck)
+                                </button>
+    
+                                <button 
+                                    onClick={() => setGameState(INITIAL_STATE)}
+                                    className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-3 px-8 rounded-full shadow-lg transition-transform hover:scale-105 flex items-center justify-center gap-3"
+                                >
+                                    <RotateCw /> Main Menu
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
             )}
 
             {/* SCREEN: GAME OVER */}

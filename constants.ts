@@ -251,6 +251,50 @@ export const CARDS: Record<string, Omit<Card, 'id'>> = {
     rarity: 'common',
     mathType: 'integer_word_problem'
   },
+  
+  // --- NEW HEALING CARDS ---
+  regeneration: {
+    name: 'Regeneration',
+    type: 'skill',
+    cost: 1,
+    value: 2,
+    description: 'Heal 2 HP. Draw 1 card.',
+    effectId: 'heal_draw',
+    rarity: 'rare',
+    mathType: 'addition'
+  },
+  vampiric_strike: {
+    name: 'Double Negative Strike',
+    type: 'attack',
+    cost: 2,
+    value: 4,
+    description: 'Deal 4 damage. Heal 2 HP.',
+    effectId: 'damage_heal',
+    rarity: 'rare',
+    mathType: 'subtraction'
+  },
+  meditation: {
+    name: 'Meditation',
+    type: 'skill',
+    cost: 2,
+    value: 6,
+    description: 'Heal 6 HP. Exhaust.',
+    effectId: 'heal_player',
+    rarity: 'epic',
+    mathType: 'division',
+    exhaust: true
+  },
+  healthy_snack: {
+    name: 'Healthy Snack',
+    type: 'skill',
+    cost: 0,
+    value: 2,
+    description: 'Heal 2 HP. Exhaust.',
+    effectId: 'heal_player',
+    rarity: 'common',
+    mathType: 'addition',
+    exhaust: true
+  },
 
   // --- TIER 3 LEGENDARY CARDS ---
   limit_break: {
@@ -324,7 +368,11 @@ export const REWARD_POOL_IDS = [
   'simplify',
   'loose_notes_chaos',
   'decimal_salve',
-  'integer_fortress'
+  'integer_fortress',
+  'regeneration',
+  'vampiric_strike',
+  'meditation',
+  'healthy_snack'
 ];
 
 export const TIER_3_REWARD_IDS = [
@@ -380,6 +428,9 @@ const SVG_MINIBOSS_GUARDIAN = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100
 
 // Unique Enemy: Math Mimic (Replaces Elites)
 const SVG_MATH_MIMIC = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="35" width="60" height="45" rx="5" fill="%23a855f7" stroke="%236b21a8" stroke-width="3"/><path d="M20 35 L80 35 L70 15 L30 15 Z" fill="%239333ea" stroke="%236b21a8" stroke-width="3"/><path d="M20 35 L80 35" stroke="%23000" stroke-width="2"/><path d="M35 45 L40 55 L45 45 L50 55 L55 45 L60 55 L65 45" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40" cy="25" r="3" fill="yellow" className="animate-pulse"/><circle cx="60" cy="25" r="3" fill="yellow" className="animate-pulse"/><text x="50" y="70" font-family="monospace" font-size="12" fill="white" text-anchor="middle">?</text></svg>`;
+
+// Jimmy Boss: The Ultimate Challenge
+const SVG_BOSS_JIMMY = `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="45" fill="%23facc15" stroke="black" stroke-width="3"/><circle cx="35" cy="40" r="5" fill="black"/><circle cx="65" cy="40" r="5" fill="black"/><path d="M30 70 Q50 85 70 70" stroke="black" stroke-width="3" fill="none"/><path d="M20 30 L40 35" stroke="black" stroke-width="2"/><path d="M80 30 L60 35" stroke="black" stroke-width="2"/><text x="50" y="20" font-family="sans-serif" font-size="10" text-anchor="middle" font-weight="bold">I'm Jimmy</text></svg>`;
 
 // --- ENEMIES ---
 
@@ -454,20 +505,20 @@ export const ENEMIES: Enemy[] = [
   {
     id: 'chaos_calculus',
     name: 'Chaos Calculus',
-    maxHp: 15,
-    currentHp: 15,
+    maxHp: 12, // Nerfed from 15
+    currentHp: 12,
     block: 0,
-    intent: { type: 'attack', value: 6 }, // Nerfed from 8
+    intent: { type: 'attack', value: 5 }, // Nerfed from 6
     image: SVG_CHAOS_CALCULUS
   },
   // TIER 3 BOSS
   {
     id: 'boss_infinite',
     name: 'The Infinite Prime',
-    maxHp: 20, // Initial Phase 1 Health (Weak)
-    currentHp: 20,
+    maxHp: 15, // Nerfed from 20 (Phase 1)
+    currentHp: 15,
     block: 0,
-    intent: { type: 'attack', value: 8 }, // Nerfed from 12
+    intent: { type: 'attack', value: 6 }, // Nerfed from 8
     image: SVG_BOSS_INFINITE,
     phase: 1
   },
@@ -475,15 +526,96 @@ export const ENEMIES: Enemy[] = [
   {
     id: 'miniboss_guardian',
     name: 'The Limit Guardian',
-    maxHp: 30,
-    currentHp: 30,
+    maxHp: 25, // Nerfed from 30
+    currentHp: 25,
     block: 5,
     intent: { type: 'defend', value: 5 },
     image: SVG_MINIBOSS_GUARDIAN
+  },
+  // JIMMY CHALLENGE BOSS
+  {
+    id: 'boss_jimmy',
+    name: 'Jimmy',
+    maxHp: 100,
+    currentHp: 100,
+    block: 0,
+    intent: { type: 'attack', value: 1 }, // Starts weak, scales infinitely
+    image: SVG_BOSS_JIMMY
   }
 ];
 
+export const JIMMY_WIN_TAUNTS = [
+    "Wow, you actually got that right? Lucky guess.",
+    "My grandma calculates faster than you.",
+    "Is that the best you can do?",
+    "Enjoy your little victory. It won't last.",
+    "I'm bored. Are you trying yet?",
+    "Pathetic. Simply pathetic.",
+    "You call that math? I call it a nap.",
+    "Don't get cocky, kid."
+];
+
+export const JIMMY_LOSE_TAUNTS = [
+    "HAHAHA! I knew you couldn't do it!",
+    "Back to kindergarten with you!",
+    "Too hard? Aww, poor baby.",
+    "Math is hard, isn't it?",
+    "I expected nothing and I'm still disappointed.",
+    "You failed. Just like I predicted."
+];
+
+export const JIMMY_EXCUSES = [
+    "My calculator ran out of batteries!",
+    "I was playing with a USB steering wheel!",
+    "Lag! Massive lag!",
+    "You were definitely cheating.",
+    "I let you win. It's called pity.",
+    "My little brother was playing.",
+    "Solar flares interfered with my math processing unit.",
+    "I wasn't even trying.",
+    "This game is bugged anyway."
+];
+
 // --- MAP GENERATION HELPERS ---
+
+export const GENERATE_JIMMY_MAP = (): MapNode[] => {
+    const nodes: MapNode[] = [];
+    const centerX = 50;
+    
+    // 10 Floors of Pain
+    // Floor 1-3: Warmup (Combat/Event)
+    nodes.push({ id: '1-1', type: 'combat', x: 30, y: 95, next: ['2-1'], completed: false });
+    nodes.push({ id: '1-2', type: 'combat', x: 70, y: 95, next: ['2-2'], completed: false });
+    
+    nodes.push({ id: '2-1', type: 'combat', x: 40, y: 85, next: ['3-1'], completed: false });
+    nodes.push({ id: '2-2', type: 'event', x: 60, y: 85, next: ['3-1'], completed: false });
+
+    nodes.push({ id: '3-1', type: 'rest', x: centerX, y: 75, next: ['4-1', '4-2'], completed: false });
+
+    // Floor 4-6: The Gauntlet (Elites/Combat)
+    nodes.push({ id: '4-1', type: 'elite', x: 30, y: 65, next: ['5-1'], completed: false });
+    nodes.push({ id: '4-2', type: 'combat', x: 70, y: 65, next: ['5-1'], completed: false });
+
+    nodes.push({ id: '5-1', type: 'event', x: centerX, y: 55, next: ['6-1', '6-2'], completed: false });
+
+    nodes.push({ id: '6-1', type: 'elite', x: 40, y: 45, next: ['7-1'], completed: false });
+    nodes.push({ id: '6-2', type: 'elite', x: 60, y: 45, next: ['7-1'], completed: false });
+
+    // Floor 7-9: The Final Stretch
+    nodes.push({ id: '7-1', type: 'rest', x: centerX, y: 35, next: ['8-1', '8-2', '8-3'], completed: false });
+
+    nodes.push({ id: '8-1', type: 'combat', x: 20, y: 25, next: ['9-1'], completed: false });
+    nodes.push({ id: '8-2', type: 'elite', x: 50, y: 25, next: ['9-1'], completed: false });
+    nodes.push({ id: '8-3', type: 'combat', x: 80, y: 25, next: ['9-1'], completed: false });
+
+    // Pre-Boss Heal
+    nodes.push({ id: '9-1', type: 'rest', x: centerX, y: 15, next: ['10-1'], completed: false });
+
+    // Jimmy
+    nodes.push({ id: '10-1', type: 'boss', x: centerX, y: 5, next: [], completed: false });
+
+    return nodes;
+};
 
 export const GENERATE_MAP = (tier: number = 1): MapNode[] => {
     // Tier 3 Map: The Final Ascent

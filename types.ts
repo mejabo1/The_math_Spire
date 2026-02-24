@@ -14,6 +14,7 @@ export interface Card {
   rarity: 'common' | 'rare' | 'epic';
   mathType?: MathTopic; // Optional: Force a specific math problem type for this card
   upgraded?: boolean; // New flag for upgrade status
+  exhaust?: boolean; // If true, removed from combat when played
 }
 
 export interface EnemyIntent {
@@ -60,6 +61,7 @@ export interface GameState {
   tutorialSeen: boolean;
   poisonTutorialSeen: boolean;
   lastRewardGold: number; // Added field
+  gameMode?: 'standard' | 'jimmy_challenge'; // New Game Mode
 }
 
 export type RoomType = 'combat' | 'elite' | 'event' | 'rest' | 'boss';

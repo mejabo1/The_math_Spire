@@ -22,6 +22,7 @@ interface CombatProps {
   backgroundImage?: string;
   tier?: number;
   tutorialType?: 'intro' | 'poison';
+  devSkipMath?: boolean;
 }
 
 type TurnPhase = 'PLAYER' | 'TARGETING' | 'MATH_CHALLENGE' | 'HAND_SELECTION' | 'ENEMY_ANIMATING' | 'ENEMY' | 'END' | 'TRANSITION';
@@ -43,7 +44,8 @@ export const Combat: React.FC<CombatProps> = ({
     showTutorial,
     onTutorialComplete,
     tier = 1,
-    tutorialType = 'intro'
+    tutorialType = 'intro',
+    devSkipMath = false
 }) => {
   const [player, setPlayer] = useState<Player>(initialPlayer);
   const [enemies, setEnemies] = useState<Enemy[]>(initialEnemies);
@@ -231,9 +233,16 @@ export const Combat: React.FC<CombatProps> = ({
           setPendingCard(card);
           if (targetType === 'enemy' && livingEnemies.length === 1) setTargetId(livingEnemies[0].id);
           else setTargetId(null);
-          // Pass current tier to math generator
-          setActiveProblem(generateProblem(card.mathType, tier));
-          setTurnPhase('MATH_CHALLENGE');
+          
+          // DEV SKIP MATH CHECK
+          if (devSkipMath) {
+              const tId = (targetType === 'enemy' && livingEnemies.length === 1) ? livingEnemies[0].id : null;
+              playCard(card, tId);
+          } else {
+              // Pass current tier to math generator
+              setActiveProblem(generateProblem(card.mathType, tier));
+              setTurnPhase('MATH_CHALLENGE');
+          }
       }
   };
 
@@ -241,8 +250,14 @@ export const Combat: React.FC<CombatProps> = ({
       if (showTutorial) return;
       if (turnPhase === 'TARGETING' && enemy.currentHp > 0) {
           setTargetId(enemy.id);
-          setActiveProblem(generateProblem(pendingCard?.mathType, tier));
-          setTurnPhase('MATH_CHALLENGE');
+          
+          // DEV SKIP MATH CHECK
+          if (devSkipMath) {
+              playCard(pendingCard!, enemy.id);
+          } else {
+              setActiveProblem(generateProblem(pendingCard?.mathType, tier));
+              setTurnPhase('MATH_CHALLENGE');
+          }
       }
   };
 
@@ -300,8 +315,9 @@ export const Combat: React.FC<CombatProps> = ({
       setPlayer(p => ({
         ...p,
         hand: p.hand.filter(c => c.id !== card.id),
-        discardPile: [...p.discardPile, card]
+        discardPile: card.exhaust ? p.discardPile : [...p.discardPile, card]
     }));
+    if (card.exhaust) triggerVfx("Exhausted", "info", "player");
     setPendingCard(null);
     setTargetId(null);
     setActiveProblem(null);
@@ -318,6 +334,26 @@ export const Combat: React.FC<CombatProps> = ({
              setPlayer(p => {
                 triggerVfx(`+${card.value} HP`, "info", "player");
                 return { ...p, currentHp: Math.min(p.maxHp, p.currentHp + card.value) };
+             });
+             break;
+        case 'heal_draw':
+             setPlayer(p => {
+                triggerVfx(`+${card.value} HP`, "info", "player");
+                const { deck, discard, hand } = drawCards(p.drawPile, p.discardPile, 1, () => addLog("Deck shuffled."));
+                triggerVfx("Draw 1", "info", "player");
+                return { ...p, currentHp: Math.min(p.maxHp, p.currentHp + card.value), drawPile: deck, discardPile: discard, hand: [...p.hand, ...hand] };
+             });
+             break;
+        case 'damage_heal':
+             if (targetId) dealDamage(damage, targetId, true);
+             setPlayer(p => {
+                triggerVfx(`+${Math.floor(card.value / 2)} HP`, "info", "player"); // Heal half of damage value (or specific value if defined)
+                // Actually, let's use a fixed heal value for simplicity or define it in card value. 
+                // The card definition says "Deal 4 damage. Heal 2 HP." 
+                // Let's assume card.value is damage, and heal is fixed or derived.
+                // For flexibility, let's say heal is fixed at 2 for now, or use a custom property if we had one.
+                // Let's just hardcode 2 for now as per request "Heal 2 HP".
+                return { ...p, currentHp: Math.min(p.maxHp, p.currentHp + 2) };
              });
              break;
         case 'chaos_hand':
@@ -504,8 +540,8 @@ export const Combat: React.FC<CombatProps> = ({
 
                      return {
                          ...e,
-                         currentHp: 70,
-                         maxHp: 70,
+                         currentHp: 50, // Nerfed from 70
+                         maxHp: 50, // Nerfed from 70
                          phase: 2,
                          image: SVG_BOSS_INFINITE_TRUE_FORM,
                          name: "The Infinite Prime (True Form)",
@@ -525,7 +561,7 @@ export const Combat: React.FC<CombatProps> = ({
                 triggerEnemyShake(e.id);
                 
                 // Boss Taunt Logic
-                if (e.id.includes('boss')) {
+                if (e.id.includes('boss') && e.id !== 'boss-jimmy') {
                     const currentHitCount = (bossHitCounter[e.id] || 0) + 1;
                     setBossHitCounter(prev => ({ ...prev, [e.id]: currentHitCount }));
 
@@ -537,6 +573,10 @@ export const Combat: React.FC<CombatProps> = ({
                     }
 
                     if (taunt) showEnemyTaunt(e.id, taunt);
+                } else if (e.id === 'boss-jimmy') {
+                    // Jimmy specific hit tracking for scaling, but no puns
+                    const currentHitCount = (bossHitCounter[e.id] || 0) + 1;
+                    setBossHitCounter(prev => ({ ...prev, [e.id]: currentHitCount }));
                 }
 
                 return { ...e, block: e.block - blocked, currentHp: newHp };
@@ -618,7 +658,7 @@ export const Combat: React.FC<CombatProps> = ({
             const intent = enemy.intent;
             
             if (intent.type === 'attack') {
-                if (enemy.id.includes('boss')) {
+                if (enemy.id.includes('boss') && enemy.id !== 'boss-jimmy') {
                     showEnemyTaunt(enemy.id, BOSS_ATTACK_TAUNTS[Math.floor(Math.random() * BOSS_ATTACK_TAUNTS.length)]);
                 }
                 setEnemyAnimStates(prev => ({ ...prev, [enemy.id]: 'attack' }));
@@ -630,7 +670,7 @@ export const Combat: React.FC<CombatProps> = ({
 
             } else if (intent.type === 'drain') {
                 // New Vampirism/Drain Logic for Boss 2
-                if (enemy.id.includes('boss')) {
+                if (enemy.id.includes('boss') && enemy.id !== 'boss-jimmy') {
                     showEnemyTaunt(enemy.id, "I hunger for your integers!");
                 }
                 setEnemyAnimStates(prev => ({ ...prev, [enemy.id]: 'attack' }));
@@ -750,12 +790,12 @@ export const Combat: React.FC<CombatProps> = ({
       if (enemy && enemy.id.includes('miniboss_guardian')) {
           if (lastType === 'defend') {
               // After defend, heavy attack
-              return { type: 'attack' as const, value: 8 }; // Reduced from 12
+              return { type: 'attack' as const, value: 6 }; // Reduced from 8
           }
           // 50/50 Chance to Defend heavy or Attack
           const r = Math.random();
-          if (r > 0.5) return { type: 'defend' as const, value: 15 };
-          return { type: 'attack' as const, value: 6 }; // Reduced from 9
+          if (r > 0.5) return { type: 'defend' as const, value: 10 }; // Reduced from 15
+          return { type: 'attack' as const, value: 4 }; // Reduced from 6
       }
 
       // Tier 3 Boss Logic (Infinite Prime) - Relentless Scaling - NERFED
@@ -766,17 +806,35 @@ export const Combat: React.FC<CombatProps> = ({
            
            if (isPhase2) {
                // More aggressive in Phase 2
-               if (lastType === 'defend') return { type: 'attack' as const, value: 12 }; // Reduced from 18
-               if (r < 0.1) return { type: 'defend' as const, value: 25 }; 
-               return { type: 'attack' as const, value: 8 }; // Reduced from 12
+               if (lastType === 'defend') return { type: 'attack' as const, value: 10 }; // Reduced from 12
+               if (r < 0.1) return { type: 'defend' as const, value: 18 }; // Reduced from 25
+               return { type: 'attack' as const, value: 6 }; // Reduced from 8
            }
 
            // Phase 1
-           if (lastType === 'defend') return { type: 'attack' as const, value: 10 }; // Reduced from 15
+           if (lastType === 'defend') return { type: 'attack' as const, value: 8 }; // Reduced from 10
            
-           if (r < 0.2) return { type: 'defend' as const, value: 20 }; 
-           if (r < 0.6) return { type: 'attack' as const, value: 10 }; // Reduced from 15
-           return { type: 'attack' as const, value: 6 }; // Reduced from 8
+           if (r < 0.2) return { type: 'defend' as const, value: 15 }; // Reduced from 20
+           if (r < 0.6) return { type: 'attack' as const, value: 8 }; // Reduced from 10
+           return { type: 'attack' as const, value: 4 }; // Reduced from 6
+      }
+
+      // JIMMY BOSS LOGIC
+      if (enemy && enemy.id === 'boss-jimmy') {
+          // Jimmy scales every turn!
+          const turnCount = bossHitCounter[enemy.id] || 0; // Using hit counter as proxy for turns/interaction
+          const scale = Math.floor(turnCount / 2); 
+          
+          const r = Math.random();
+          if (r < 0.3) {
+              return { type: 'attack' as const, value: 5 + scale };
+          } else if (r < 0.6) {
+              return { type: 'defend' as const, value: 5 + scale };
+          } else if (r < 0.8) {
+              return { type: 'poison' as const, value: 2 + Math.floor(scale/3) };
+          } else {
+              return { type: 'drain' as const, value: 3 + Math.floor(scale/2) };
+          }
       }
       
       // Poison Enemy Logic
